@@ -1,32 +1,30 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { db } from "./firebase";
+import {
+  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy, query
+} from "firebase/firestore";
 
-const DEFAULT_DEPTS=[{id:1,name:"المشتريات",icon:"🛒",color:"#B87B0A"},{id:2,name:"المحاسبة",icon:"💰",color:"#0F6E56"},{id:3,name:"التصنيع",icon:"⚙️",color:"#185FA5"},{id:4,name:"المبيعات",icon:"📈",color:"#993556"}];
-const DEFAULT_USERS=[{id:1,name:"سالم المطيري",role:"مدير",dept:null,av:"سم",type:"admin",bg:"#534AB7",fg:"#EEEDFE"},{id:2,name:"أحمد الشمري",role:"مشتريات",dept:1,av:"أش",type:"employee",bg:"#B87B0A",fg:"#FAEEDA"},{id:3,name:"نورة القحطاني",role:"محاسبة",dept:2,av:"نق",type:"employee",bg:"#0F6E56",fg:"#E1F5EE"},{id:4,name:"خالد الزهراني",role:"تصنيع",dept:3,av:"خز",type:"employee",bg:"#185FA5",fg:"#E6F1FB"},{id:5,name:"سارة العتيبي",role:"مبيعات",dept:4,av:"سع",type:"employee",bg:"#993556",fg:"#FBEAF0"},{id:6,name:"شركة النسيج",role:"عميل",dept:null,av:"عم",type:"client",bg:"#5F5E5A",fg:"#F1EFE8"}];
+const DEFAULT_DEPTS=[{id:"dept1",name:"المشتريات",icon:"🛒",color:"#B87B0A"},{id:"dept2",name:"المحاسبة",icon:"💰",color:"#0F6E56"},{id:"dept3",name:"التصنيع",icon:"⚙️",color:"#185FA5"},{id:"dept4",name:"المبيعات",icon:"📈",color:"#993556"}];
+const DEFAULT_USERS=[{id:"user1",name:"سالم المطيري",role:"مدير",dept:null,av:"سم",type:"admin",bg:"#534AB7",fg:"#EEEDFE"},{id:"user2",name:"أحمد الشمري",role:"مشتريات",dept:"dept1",av:"أش",type:"employee",bg:"#B87B0A",fg:"#FAEEDA"},{id:"user3",name:"نورة القحطاني",role:"محاسبة",dept:"dept2",av:"نق",type:"employee",bg:"#0F6E56",fg:"#E1F5EE"},{id:"user4",name:"خالد الزهراني",role:"تصنيع",dept:"dept3",av:"خز",type:"employee",bg:"#185FA5",fg:"#E6F1FB"},{id:"user5",name:"سارة العتيبي",role:"مبيعات",dept:"dept4",av:"سع",type:"employee",bg:"#993556",fg:"#FBEAF0"},{id:"user6",name:"شركة النسيج",role:"عميل",dept:null,av:"عم",type:"client",bg:"#5F5E5A",fg:"#F1EFE8"}];
 const PR_COLOR={"عاجلة":"#E24B4A","عالية":"#BA7517","متوسطة":"#185FA5","منخفضة":"#3B6D11"};
 const ST_COLOR={"لم تبدأ":"#5F5E5A","قيد التنفيذ":"#BA7517","مكتملة":"#0F6E56"};
 const DEPT_COLORS=["#B87B0A","#0F6E56","#185FA5","#993556","#534AB7","#7C3D8F","#C0392B","#1A6B5A"];
 const DEPT_ICONS=["🛒","💰","⚙️","📈","📦","🔧","📋","🏭","💼","🎯"];
 const AV_COLORS=["#534AB7","#B87B0A","#0F6E56","#185FA5","#993556","#7C3D8F","#C0392B","#1A6B5A"];
 
-const INIT_TICKETS=[
-  {id:"TK-001",title:"شراء قماش قطني",type:"شراء",priority:"عالية",status:"قيد التنفيذ",openedBy:2,currentDept:2,currentAssignee:3,createdAt:"2026-05-20",dueDate:"2026-06-10",transfers:[{from:2,to:3,dept:2,note:"محتاج اعتماد ميزانية",time:"09:30"}],chat:[{uid:2,text:"نحتاج 500 متر قماش قطني درجة أولى",time:"09:00",type:"msg"},{uid:2,text:"تحويل إلى نورة القحطاني (المحاسبة) — محتاج اعتماد ميزانية",time:"09:30",type:"transfer"},{uid:3,text:"جاري مراجعة الميزانية",time:"10:30",type:"msg"}]},
-  {id:"TK-002",title:"صيانة ماكينة الخياطة",type:"صيانة",priority:"عاجلة",status:"لم تبدأ",openedBy:4,currentDept:3,currentAssignee:4,createdAt:"2026-05-22",dueDate:"2026-05-30",transfers:[],chat:[{uid:4,text:"الماكينة رقم 3 تحتاج صيانة عاجلة",time:"08:00",type:"msg"}]},
-  {id:"TK-003",title:"استفسار عميل",type:"استفسار",priority:"متوسطة",status:"قيد التنفيذ",openedBy:6,currentDept:4,currentAssignee:5,createdAt:"2026-05-23",dueDate:"2026-06-01",transfers:[],chat:[{uid:6,text:"متى يكون الطلب جاهز؟",time:"11:00",type:"msg"},{uid:5,text:"نتوقع الجاهزية خلال أسبوع",time:"11:45",type:"msg"}]},
-  {id:"TK-004",title:"توريد أقمشة صيفية",type:"شراء",priority:"منخفضة",status:"مكتملة",openedBy:2,currentDept:1,currentAssignee:2,createdAt:"2026-05-10",dueDate:"2026-05-25",transfers:[],chat:[{uid:2,text:"تم استلام البضاعة بالكامل",time:"14:00",type:"msg"}]}
-];
-const INIT_TASKS=[{id:1,uid:2,title:"مراجعة عروض الأسعار",done:false,priority:"عالية"},{id:2,uid:2,title:"إرسال تقرير المشتريات",done:true,priority:"متوسطة"},{id:3,uid:3,title:"مراجعة كشف الحسابات",done:false,priority:"عالية"},{id:4,uid:4,title:"جدولة صيانة الماكينات",done:false,priority:"منخفضة"}];
-
 function initials(name){return name.trim().split(" ").map(w=>w[0]).join("").slice(0,2);}
 function Av({user,size=28}){return(<div style={{width:size,height:size,borderRadius:"50%",background:user.bg,color:user.fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:Math.round(size*0.38),flexShrink:0}}>{user.av}</div>);}
 function Badge({label,color}){return(<span style={{display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:700,background:color+"20",color,whiteSpace:"nowrap"}}>{label}</span>);}
+function Loader(){return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0a0a0f",color:"#a5b4fc",fontSize:16,fontFamily:"'Cairo',sans-serif"}}>جاري التحميل...</div>);}
 
 export default function App(){
   const [currentUser,setCurrentUser]=useState(DEFAULT_USERS[0]);
   const [page,setPage]=useState("dashboard");
-  const [tickets,setTickets]=useState(INIT_TICKETS);
-  const [depts,setDepts]=useState(DEFAULT_DEPTS);
-  const [users,setUsers]=useState(DEFAULT_USERS);
-  const [personalTasks,setPersonalTasks]=useState(INIT_TASKS);
+  const [tickets,setTickets]=useState([]);
+  const [depts,setDepts]=useState([]);
+  const [users,setUsers]=useState([]);
+  const [personalTasks,setPersonalTasks]=useState([]);
+  const [loading,setLoading]=useState(true);
   const [selectedTicket,setSelectedTicket]=useState(null);
   const [empTab,setEmpTab]=useState("tickets");
   const [settingsTab,setSettingsTab]=useState("depts");
@@ -34,95 +32,139 @@ export default function App(){
   const [newTaskText,setNewTaskText]=useState("");
   const [showModal,setShowModal]=useState(false);
   const [showTransfer,setShowTransfer]=useState(false);
-  const [transferDept,setTransferDept]=useState(1);
-  const [transferUser,setTransferUser]=useState(2);
+  const [transferDept,setTransferDept]=useState("");
+  const [transferUser,setTransferUser]=useState("");
   const [transferNote,setTransferNote]=useState("");
-  const [form,setForm]=useState({title:"",type:"شراء",priority:"متوسطة",assignedTo:2,dueDate:""});
-  // Settings forms
+  const [form,setForm]=useState({title:"",type:"شراء",priority:"متوسطة",assignedTo:"",dueDate:""});
   const [newDept,setNewDept]=useState({name:"",icon:"📦",color:"#534AB7"});
-  const [newUser,setNewUser]=useState({name:"",dept:1,type:"employee"});
+  const [newUser,setNewUser]=useState({name:"",dept:"",type:"employee"});
   const [editDept,setEditDept]=useState(null);
   const [editUser,setEditUser]=useState(null);
   const fileRef=useRef();
+  const initialized=useRef(false);
+
+  // Init default data if empty
+  useEffect(()=>{
+    if(initialized.current)return;
+    initialized.current=true;
+    const initData=async()=>{
+      // Check if depts exist
+      const deptsSnap=await new Promise(res=>{const u=onSnapshot(collection(db,"depts"),s=>{u();res(s);});});
+      if(deptsSnap.empty){
+        for(const d of DEFAULT_DEPTS) await setDoc(doc(db,"depts",d.id),d);
+        for(const u of DEFAULT_USERS) await setDoc(doc(db,"users",u.id),u);
+      }
+    };
+    initData().catch(console.error);
+  },[]);
+
+  // Realtime listeners
+  useEffect(()=>{
+    const u1=onSnapshot(collection(db,"depts"),s=>{setDepts(s.docs.map(d=>({id:d.id,...d.data()})));});
+    const u2=onSnapshot(collection(db,"users"),s=>{setUsers(s.docs.map(d=>({id:d.id,...d.data()})));});
+    const u3=onSnapshot(query(collection(db,"tickets"),orderBy("createdAt","desc")),s=>{setTickets(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);});
+    const u4=onSnapshot(collection(db,"tasks"),s=>{setPersonalTasks(s.docs.map(d=>({id:d.id,...d.data()})));});
+    return()=>{u1();u2();u3();u4();};
+  },[]);
+
+  // Sync selectedTicket with latest data
+  useEffect(()=>{
+    if(selectedTicket){const t=tickets.find(t=>t.id===selectedTicket.id);if(t)setSelectedTicket(t);}
+  },[tickets]);
+
+  useEffect(()=>{
+    if(depts.length>0&&!transferDept){setTransferDept(depts[0]?.id);const first=users.find(u=>u.dept===depts[0]?.id&&u.type==="employee");if(first)setTransferUser(first.id);}
+    if(users.length>0&&!form.assignedTo){const emp=users.find(u=>u.type==="employee");if(emp)setForm(f=>({...f,assignedTo:emp.id}));}
+    if(depts.length>0&&!newUser.dept)setNewUser(n=>({...n,dept:depts[0]?.id}));
+  },[depts,users]);
 
   const isAdmin=currentUser.type==="admin";
   const isClient=currentUser.type==="client";
   const visible=isAdmin?tickets:isClient?tickets.filter(t=>t.openedBy===currentUser.id):tickets.filter(t=>t.openedBy===currentUser.id||t.currentAssignee===currentUser.id||t.currentDept===currentUser.dept);
 
-  function navTo(p){setPage(p);setSelectedTicket(null);}
-  function switchUser(u){setCurrentUser(u);setSelectedTicket(null);setPage("dashboard");}
+  function now(){const d=new Date();return`${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;}
 
-  function sendChat(){
+  async function sendChat(){
     if(!chatMsg.trim()||!selectedTicket)return;
-    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,chat:[...t.chat,{uid:currentUser.id,text:chatMsg,time,type:"msg"}]}:t);
-    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));setChatMsg("");
+    const t=selectedTicket;
+    const chat=[...( t.chat||[]),{uid:currentUser.id,text:chatMsg,time:now(),type:"msg"}];
+    await updateDoc(doc(db,"tickets",t.id),{chat});
+    setChatMsg("");
   }
 
   function sendFile(e){
     const file=e.target.files[0];if(!file||!selectedTicket)return;
-    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
     const isImg=file.type.startsWith("image/");
     const reader=new FileReader();
-    reader.onload=ev=>{
-      const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,chat:[...t.chat,{uid:currentUser.id,text:file.name,time,type:isImg?"image":"file",data:ev.target.result}]}:t);
-      setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+    reader.onload=async ev=>{
+      const t=selectedTicket;
+      const chat=[...(t.chat||[]),{uid:currentUser.id,text:file.name,time:now(),type:isImg?"image":"file",data:ev.target.result}];
+      await updateDoc(doc(db,"tickets",t.id),{chat});
     };reader.readAsDataURL(file);e.target.value="";
   }
 
-  function doTransfer(){
+  async function doTransfer(){
     if(!selectedTicket)return;
-    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
     const toUser=users.find(u=>u.id===transferUser);const toDept=depts.find(d=>d.id===transferDept);
-    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,currentAssignee:transferUser,currentDept:transferDept,status:"قيد التنفيذ",transfers:[...t.transfers,{from:currentUser.id,to:transferUser,dept:transferDept,note:transferNote,time}],chat:[...t.chat,{uid:currentUser.id,text:`تحويل إلى ${toUser?.name} (${toDept?.name})${transferNote?` — ${transferNote}`:""}`,time,type:"transfer"}]}:t);
-    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+    const t=selectedTicket;
+    const transfers=[...(t.transfers||[]),{from:currentUser.id,to:transferUser,dept:transferDept,note:transferNote,time:now()}];
+    const chat=[...(t.chat||[]),{uid:currentUser.id,text:`تحويل إلى ${toUser?.name} (${toDept?.name})${transferNote?` — ${transferNote}`:""}`,time:now(),type:"transfer"}];
+    await updateDoc(doc(db,"tickets",t.id),{currentAssignee:transferUser,currentDept:transferDept,status:"قيد التنفيذ",transfers,chat});
     setShowTransfer(false);setTransferNote("");
   }
 
-  function closeTicket(){
+  async function closeTicket(){
     if(!selectedTicket)return;
-    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,status:"مكتملة",chat:[...t.chat,{uid:currentUser.id,text:"تم إغلاق التذكرة ✓",time,type:"system"}]}:t);
-    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+    const t=selectedTicket;
+    const chat=[...(t.chat||[]),{uid:currentUser.id,text:"تم إغلاق التذكرة ✓",time:now(),type:"system"}];
+    await updateDoc(doc(db,"tickets",t.id),{status:"مكتملة",chat});
   }
 
-  function createTicket(){
+  async function createTicket(){
     if(!form.title.trim())return;
-    const id="TK-"+String(tickets.length+1).padStart(3,"0");
-    const now=new Date();const time=now.toTimeString().slice(0,5);const date=now.toISOString().split("T")[0];
     const assignee=users.find(u=>u.id===form.assignedTo);
-    setTickets([...tickets,{...form,id,openedBy:currentUser.id,currentDept:assignee?.dept||currentUser.dept,currentAssignee:form.assignedTo,createdAt:date,transfers:[],chat:[{uid:currentUser.id,text:`تم فتح التذكرة: ${form.title}`,time,type:"system"}]}]);
-    setShowModal(false);setForm({title:"",type:"شراء",priority:"متوسطة",assignedTo:2,dueDate:""});
+    const date=new Date().toISOString().split("T")[0];
+    await addDoc(collection(db,"tickets"),{...form,openedBy:currentUser.id,currentDept:assignee?.dept||currentUser.dept,currentAssignee:form.assignedTo,createdAt:date,transfers:[],chat:[{uid:currentUser.id,text:`تم فتح التذكرة: ${form.title}`,time:now(),type:"system"}]});
+    setShowModal(false);setForm({title:"",type:"شراء",priority:"متوسطة",assignedTo:users.find(u=>u.type==="employee")?.id||"",dueDate:""});
   }
 
-  // Settings - Depts
-  function addDept(){
+  // Settings
+  async function addDept(){
     if(!newDept.name.trim())return;
-    const id=Math.max(...depts.map(d=>d.id),0)+1;
-    setDepts([...depts,{...newDept,id}]);setNewDept({name:"",icon:"📦",color:"#534AB7"});
+    await addDoc(collection(db,"depts"),{...newDept});
+    setNewDept({name:"",icon:"📦",color:"#534AB7"});
   }
-  function deleteDept(id){if(users.some(u=>u.dept===id)){alert("لا يمكن حذف قسم فيه موظفين");return;}setDepts(depts.filter(d=>d.id!==id));}
-  function saveEditDept(){setDepts(depts.map(d=>d.id===editDept.id?editDept:d));setEditDept(null);}
+  async function deleteDept(id){
+    if(users.some(u=>u.dept===id)){alert("لا يمكن حذف قسم فيه موظفين");return;}
+    await deleteDoc(doc(db,"depts",id));
+  }
+  async function saveEditDept(){await updateDoc(doc(db,"depts",editDept.id),editDept);setEditDept(null);}
 
-  // Settings - Users
-  function addUser(){
+  async function addUser(){
     if(!newUser.name.trim())return;
-    const id=Math.max(...users.map(u=>u.id),0)+1;
     const dept=depts.find(d=>d.id===newUser.dept);
-    const colorIdx=(id-1)%AV_COLORS.length;
-    const av=initials(newUser.name);
-    setUsers([...users,{id,name:newUser.name,role:dept?.name||"موظف",dept:newUser.type==="employee"?newUser.dept:null,av,type:newUser.type,bg:AV_COLORS[colorIdx],fg:"#fff"}]);
-    setNewUser({name:"",dept:1,type:"employee"});
+    const colorIdx=users.length%AV_COLORS.length;
+    await addDoc(collection(db,"users"),{name:newUser.name,role:newUser.type==="employee"?dept?.name||"موظف":newUser.type==="admin"?"مدير":"عميل",dept:newUser.type==="employee"?newUser.dept:null,av:initials(newUser.name),type:newUser.type,bg:AV_COLORS[colorIdx],fg:"#fff"});
+    setNewUser({name:"",dept:depts[0]?.id||"",type:"employee"});
   }
-  function deleteUser(id){if(id===currentUser.id){alert("لا يمكن حذف المستخدم الحالي");return;}setUsers(users.filter(u=>u.id!==id));}
-  function saveEditUser(){
+  async function deleteUser(id){
+    if(id===currentUser.id){alert("لا يمكن حذف المستخدم الحالي");return;}
+    await deleteDoc(doc(db,"users",id));
+  }
+  async function saveEditUser(){
     const dept=depts.find(d=>d.id===editUser.dept);
-    setUsers(users.map(u=>u.id===editUser.id?{...editUser,role:editUser.type==="employee"?dept?.name||"موظف":editUser.role,av:initials(editUser.name)}:u));
+    await updateDoc(doc(db,"users",editUser.id),{...editUser,role:editUser.type==="employee"?dept?.name||"موظف":editUser.role,av:initials(editUser.name)});
     setEditUser(null);
   }
 
-  function toggleTask(id){setPersonalTasks(personalTasks.map(t=>t.id===id?{...t,done:!t.done}:t));}
-  function addTask(){if(!newTaskText.trim())return;setPersonalTasks([...personalTasks,{id:Date.now(),uid:currentUser.id,title:newTaskText.trim(),done:false,priority:"متوسطة"}]);setNewTaskText("");}
+  async function toggleTask(id,done){await updateDoc(doc(db,"tasks",id),{done:!done});}
+  async function addTask(){
+    if(!newTaskText.trim())return;
+    await addDoc(collection(db,"tasks"),{uid:currentUser.id,title:newTaskText.trim(),done:false,priority:"متوسطة"});
+    setNewTaskText("");
+  }
+
+  if(loading)return <Loader/>;
 
   const navItems=[{id:"dashboard",icon:"🏠",label:"الرئيسية"},{id:"tickets",icon:"🎫",label:"التذاكر"},...(!isClient?[{id:"my",icon:"✅",label:"مهامي"}]:[]),...(isAdmin?[{id:"team",icon:"👥",label:"الفريق"},{id:"settings",icon:"⚙️",label:"الإعدادات"}]:[])];
   const stats=[{l:"إجمالي التذاكر",v:visible.length,c:"#534AB7"},{l:"قيد التنفيذ",v:visible.filter(t=>t.status==="قيد التنفيذ").length,c:"#BA7517"},{l:"مكتملة",v:visible.filter(t=>t.status==="مكتملة").length,c:"#0F6E56"},{l:"عاجلة",v:visible.filter(t=>t.priority==="عاجلة").length,c:"#E24B4A"}];
@@ -139,11 +181,11 @@ export default function App(){
           <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:15}}>T</div>
           <span style={{fontWeight:900,fontSize:18,background:"linear-gradient(135deg,#a5b4fc,#c4b5fd)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Taskly</span>
         </div>
-        {navItems.map(n=><button key={n.id} className={`nav-btn${page===n.id?" active":""}`} onClick={()=>navTo(n.id)}><span>{n.icon}</span><span>{n.label}</span></button>)}
+        {navItems.map(n=><button key={n.id} className={`nav-btn${page===n.id?" active":""}`} onClick={()=>{setPage(n.id);setSelectedTicket(null);}}><span>{n.icon}</span><span>{n.label}</span></button>)}
         <div style={{flex:1}}/>
         <div style={{borderTop:"1px solid #1e1e24",paddingTop:12}}>
           <div style={{fontSize:10,color:"#52525b",marginBottom:8,paddingRight:4}}>تبديل المستخدم</div>
-          {users.map(u=><div key={u.id} onClick={()=>switchUser(u)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:8,cursor:"pointer",background:currentUser.id===u.id?"#18181b":"transparent"}}>
+          {users.map(u=><div key={u.id} onClick={()=>{setCurrentUser(u);setSelectedTicket(null);setPage("dashboard");}} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:8,cursor:"pointer",background:currentUser.id===u.id?"#18181b":"transparent"}}>
             <Av user={u} size={24}/><div style={{minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:currentUser.id===u.id?"#a5b4fc":"#a1a1aa",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name.split(" ")[0]}</div><div style={{fontSize:9,color:"#52525b"}}>{u.role}</div></div>
           </div>)}
         </div>
@@ -175,8 +217,8 @@ export default function App(){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="card" style={{padding:18}}>
                 <div style={{fontWeight:800,marginBottom:14,fontSize:14}}>آخر التذاكر</div>
-                {visible.slice(0,4).map(t=>{const op=users.find(u=>u.id===t.openedBy);return op?(<div key={t.id} className="ticket-row" onClick={()=>{setSelectedTicket(t);setPage("tickets");}}>
-                  <Av user={op} size={30}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id} · {t.createdAt}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
+                {visible.slice(0,5).map(t=>{const op=users.find(u=>u.id===t.openedBy);return op?(<div key={t.id} className="ticket-row" onClick={()=>{setSelectedTicket(t);setPage("tickets");}}>
+                  <Av user={op} size={30}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id?.slice(0,8)} · {t.createdAt}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
                 </div>):null;})}
               </div>
               <div className="card" style={{padding:18}}>
@@ -191,7 +233,7 @@ export default function App(){
             {["لم تبدأ","قيد التنفيذ","مكتملة"].map(st=>{const cols=visible.filter(t=>t.status===st);return(<div key={st}>
               <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}><div style={{width:8,height:8,borderRadius:"50%",background:ST_COLOR[st]}}/><span style={{fontWeight:800,fontSize:13}}>{st}</span><span style={{fontSize:11,color:"#71717a",background:"#18181b",padding:"1px 7px",borderRadius:10}}>{cols.length}</span></div>
               {cols.map(t=>{const op=users.find(u=>u.id===t.openedBy);const as=users.find(u=>u.id===t.currentAssignee);const dept=depts.find(d=>d.id===t.currentDept);return op?(<div key={t.id} className="kan-card" onClick={()=>setSelectedTicket(t)}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:"#52525b",fontWeight:700}}>{t.id}</span><Badge label={t.priority} color={PR_COLOR[t.priority]}/></div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:"#52525b",fontWeight:700}}>{t.id?.slice(0,8)}</span><Badge label={t.priority} color={PR_COLOR[t.priority]}/></div>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{t.title}</div>
                 {dept&&<div style={{fontSize:11,color:dept.color,marginBottom:8}}>{dept.icon} {dept.name}</div>}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",gap:4}}><Av user={op} size={22}/>{as&&as.id!==op.id&&<Av user={as} size={22}/>}</div><span style={{fontSize:10,color:"#52525b"}}>{t.dueDate}</span></div>
@@ -208,12 +250,12 @@ export default function App(){
                 <div className="card" style={{display:"flex",flexDirection:"column",height:520}}>
                   <div style={{padding:"14px 18px",borderBottom:"1px solid #1e1e24"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div><div style={{fontSize:10,color:"#52525b",marginBottom:3}}>{t.id}</div><div style={{fontWeight:800,fontSize:16}}>{t.title}</div></div>
+                      <div><div style={{fontSize:10,color:"#52525b",marginBottom:3}}>{t.id?.slice(0,8)}</div><div style={{fontWeight:800,fontSize:16}}>{t.title}</div></div>
                       <div style={{display:"flex",gap:6}}><Badge label={t.status} color={ST_COLOR[t.status]}/><Badge label={t.priority} color={PR_COLOR[t.priority]}/></div>
                     </div>
                   </div>
                   <div style={{flex:1,overflow:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:10}}>
-                    {t.chat.map((msg,i)=>{
+                    {(t.chat||[]).map((msg,i)=>{
                       const u=users.find(x=>x.id===msg.uid);const isMe=msg.uid===currentUser.id;
                       if(msg.type==="transfer")return(<div key={i} style={{display:"flex",justifyContent:"center"}}><div style={{background:"#1e1e3e",border:"1px solid #6366f130",borderRadius:8,padding:"6px 14px",fontSize:11,color:"#a5b4fc",textAlign:"center"}}>↗ {msg.text}</div></div>);
                       if(msg.type==="system")return(<div key={i} style={{display:"flex",justifyContent:"center"}}><div style={{background:"#1a1a22",borderRadius:8,padding:"4px 12px",fontSize:11,color:"#52525b"}}>{msg.text}</div></div>);
@@ -223,7 +265,7 @@ export default function App(){
                         <div style={{maxWidth:"70%"}}>
                           <div style={{fontSize:10,color:"#52525b",marginBottom:3,textAlign:isMe?"left":"right"}}>{u.name} · {msg.time}</div>
                           {msg.type==="image"?<img src={msg.data} alt={msg.text} style={{maxWidth:"100%",borderRadius:8,border:"1px solid #27272a"}}/>
-                          :msg.type==="file"?<div style={{background:isMe?"#1e1e3e":"#1a1a22",border:`1px solid ${isMe?"#6366f130":"#27272a"}`,padding:"8px 12px",borderRadius:10,fontSize:12,display:"flex",alignItems:"center",gap:8}}>📎 {msg.text}</div>
+                          :msg.type==="file"?<div style={{background:isMe?"#1e1e3e":"#1a1a22",border:`1px solid ${isMe?"#6366f130":"#27272a"}`,padding:"8px 12px",borderRadius:10,fontSize:12}}>📎 {msg.text}</div>
                           :<div style={{background:isMe?"#1e1e3e":"#1a1a22",border:`1px solid ${isMe?"#6366f130":"#27272a"}`,padding:"8px 12px",borderRadius:10,fontSize:12,lineHeight:1.6}}>{msg.text}</div>}
                         </div>
                       </div>);
@@ -242,9 +284,9 @@ export default function App(){
                     {as&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><Av user={as} size={36}/><div><div style={{fontSize:11,color:"#71717a"}}>المسؤول الحالي</div><div style={{fontSize:13,fontWeight:600}}>{as.name}</div>{dept&&<div style={{fontSize:11,color:dept.color,marginTop:2}}>{dept.icon} {dept.name}</div>}</div></div>}
                     {op&&<div style={{display:"flex",alignItems:"center",gap:10}}><Av user={op} size={36}/><div><div style={{fontSize:11,color:"#71717a"}}>فاتح التذكرة</div><div style={{fontSize:13,fontWeight:600}}>{op.name}</div></div></div>}
                   </div>
-                  {t.transfers.length>0&&<div className="card" style={{padding:14}}>
+                  {(t.transfers||[]).length>0&&<div className="card" style={{padding:14}}>
                     <div style={{fontWeight:800,marginBottom:12,fontSize:13}}>سجل التحويلات</div>
-                    {t.transfers.map((tr,i)=>{const fromU=users.find(u=>u.id===tr.from);const toU=users.find(u=>u.id===tr.to);const toDept=depts.find(d=>d.id===tr.dept);return(<div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<t.transfers.length-1?"1px solid #1e1e24":"none"}}>
+                    {(t.transfers||[]).map((tr,i)=>{const fromU=users.find(u=>u.id===tr.from);const toU=users.find(u=>u.id===tr.to);const toDept=depts.find(d=>d.id===tr.dept);return(<div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<t.transfers.length-1?"1px solid #1e1e24":"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>{fromU&&<Av user={fromU} size={20}/>}<span style={{fontSize:11,color:"#71717a"}}>→</span>{toU&&<Av user={toU} size={20}/>}<span style={{fontSize:11,fontWeight:600}}>{toU?.name}</span></div>
                       {toDept&&<div style={{fontSize:10,color:toDept.color}}>{toDept.icon} {toDept.name}</div>}
                       {tr.note&&<div style={{fontSize:11,color:"#a1a1aa",marginTop:3}}>"{tr.note}"</div>}
@@ -267,11 +309,11 @@ export default function App(){
                 {[["tickets","🎫 تذاكري"],["personal","✅ مهام شخصية"]].map(([id,lbl])=><button key={id} className={`tab-btn${empTab===id?" active":""}`} onClick={()=>setEmpTab(id)}>{lbl}</button>)}
               </div>
               {empTab==="tickets"&&visible.filter(t=>t.currentAssignee===currentUser.id).map(t=><div key={t.id} className="ticket-row" onClick={()=>{setSelectedTicket(t);setPage("tickets");}}>
-                <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
+                <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id?.slice(0,8)}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
               </div>)}
               {empTab==="personal"&&<div>
                 {personalTasks.filter(t=>t.uid===currentUser.id).map(t=><div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #1e1e24"}}>
-                  <div className={`task-check${t.done?" done":""}`} onClick={()=>toggleTask(t.id)}>{t.done?"✓":""}</div>
+                  <div className={`task-check${t.done?" done":""}`} onClick={()=>toggleTask(t.id,t.done)}>{t.done?"✓":""}</div>
                   <span style={{flex:1,fontSize:13,color:t.done?"#52525b":"#e2e8f0",textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
                   <Badge label={t.priority} color={PR_COLOR[t.priority]}/>
                 </div>)}
@@ -300,9 +342,8 @@ export default function App(){
           {/* SETTINGS */}
           {page==="settings"&&<div>
             <div style={{display:"flex",gap:6,marginBottom:20}}>
-              {[["depts","🏢 الأقسام"],["users","👤 الموظفين"]].map(([id,lbl])=><button key={id} className={`tab-btn${settingsTab===id?" active":""}`} onClick={()=>setSettingsTab(id)} style={{fontSize:13,padding:"7px 18px"}}>{lbl}</button>)}
+              {[["depts","🏢 الأقسام"],["users","👤 المستخدمون"]].map(([id,lbl])=><button key={id} className={`tab-btn${settingsTab===id?" active":""}`} onClick={()=>setSettingsTab(id)} style={{fontSize:13,padding:"7px 18px"}}>{lbl}</button>)}
             </div>
-
             {settingsTab==="depts"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
               <div className="card" style={{padding:20}}>
                 <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>الأقسام الحالية</div>
@@ -310,14 +351,14 @@ export default function App(){
                   {editDept?.id===d.id?<div style={{flex:1,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <input className="form-inp" value={editDept.name} onChange={e=>setEditDept({...editDept,name:e.target.value})} style={{flex:1,minWidth:100}}/>
                     <select className="form-inp" value={editDept.icon} onChange={e=>setEditDept({...editDept,icon:e.target.value})} style={{width:70}}>{DEPT_ICONS.map(ic=><option key={ic}>{ic}</option>)}</select>
-                    <select className="form-inp" value={editDept.color} onChange={e=>setEditDept({...editDept,color:e.target.value})} style={{width:100}}>{DEPT_COLORS.map(c=><option key={c} value={c} style={{background:c}}>{c}</option>)}</select>
+                    <select className="form-inp" value={editDept.color} onChange={e=>setEditDept({...editDept,color:e.target.value})} style={{width:110}}>{DEPT_COLORS.map(c=><option key={c} value={c}>{c}</option>)}</select>
                     <button className="btn btn-primary" onClick={saveEditDept} style={{padding:"6px 12px",fontSize:12}}>حفظ</button>
                     <button className="btn btn-ghost" onClick={()=>setEditDept(null)} style={{padding:"6px 10px",fontSize:12}}>إلغاء</button>
                   </div>:<>
                     <div style={{width:36,height:36,borderRadius:8,background:d.color+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{d.icon}</div>
                     <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{d.name}</div><div style={{fontSize:11,color:"#52525b"}}>{users.filter(u=>u.dept===d.id).length} موظف</div></div>
                     <button className="btn btn-ghost" onClick={()=>setEditDept({...d})} style={{padding:"5px 10px",fontSize:12}}>تعديل</button>
-                    <button className="btn btn-danger" onClick={()=>deleteDept(d.id)} style={{padding:"5px 10px"}}>حذف</button>
+                    <button className="btn btn-danger" onClick={()=>deleteDept(d.id)}>حذف</button>
                   </>}
                 </div>))}
               </div>
@@ -331,31 +372,30 @@ export default function App(){
                 <button className="btn btn-primary" onClick={addDept} style={{width:"100%"}}>+ إضافة القسم</button>
               </div>
             </div>}
-
             {settingsTab==="users"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
               <div className="card" style={{padding:20}}>
-                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>المستخدمون الحاليون</div>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>المستخدمون</div>
                 {users.map(u=>(<div key={u.id} className="settings-row">
                   {editUser?.id===u.id?<div style={{flex:1,display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <input className="form-inp" value={editUser.name} onChange={e=>setEditUser({...editUser,name:e.target.value})} style={{flex:1,minWidth:120}} placeholder="الاسم"/>
+                    <input className="form-inp" value={editUser.name} onChange={e=>setEditUser({...editUser,name:e.target.value})} style={{flex:1,minWidth:120}}/>
                     <select className="form-inp" value={editUser.type} onChange={e=>setEditUser({...editUser,type:e.target.value})} style={{width:100}}><option value="admin">مدير</option><option value="employee">موظف</option><option value="client">عميل</option></select>
-                    {editUser.type==="employee"&&<select className="form-inp" value={editUser.dept} onChange={e=>setEditUser({...editUser,dept:parseInt(e.target.value)})} style={{width:130}}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select>}
+                    {editUser.type==="employee"&&<select className="form-inp" value={editUser.dept||""} onChange={e=>setEditUser({...editUser,dept:e.target.value})} style={{width:130}}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select>}
                     <button className="btn btn-primary" onClick={saveEditUser} style={{padding:"6px 12px",fontSize:12}}>حفظ</button>
                     <button className="btn btn-ghost" onClick={()=>setEditUser(null)} style={{padding:"6px 10px",fontSize:12}}>إلغاء</button>
                   </div>:<>
                     <Av user={u} size={36}/>
                     <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{u.name}</div><div style={{fontSize:11,color:"#52525b"}}>{u.role} · {u.type==="admin"?"مدير":u.type==="client"?"عميل":"موظف"}</div></div>
                     <button className="btn btn-ghost" onClick={()=>setEditUser({...u})} style={{padding:"5px 10px",fontSize:12}}>تعديل</button>
-                    {u.id!==1&&<button className="btn btn-danger" onClick={()=>deleteUser(u.id)}>حذف</button>}
+                    {u.id!==currentUser.id&&<button className="btn btn-danger" onClick={()=>deleteUser(u.id)}>حذف</button>}
                   </>}
                 </div>))}
               </div>
               <div className="card" style={{padding:20}}>
-                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>إضافة مستخدم جديد</div>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>إضافة مستخدم</div>
                 <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الاسم الكامل</div><input className="form-inp" placeholder="مثال: محمد العمري" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}/></div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
                   <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>النوع</div><select className="form-inp" value={newUser.type} onChange={e=>setNewUser({...newUser,type:e.target.value})}><option value="employee">موظف</option><option value="admin">مدير</option><option value="client">عميل</option></select></div>
-                  {newUser.type==="employee"&&<div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>القسم</div><select className="form-inp" value={newUser.dept} onChange={e=>setNewUser({...newUser,dept:parseInt(e.target.value)})}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select></div>}
+                  {newUser.type==="employee"&&<div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>القسم</div><select className="form-inp" value={newUser.dept} onChange={e=>setNewUser({...newUser,dept:e.target.value})}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select></div>}
                 </div>
                 <button className="btn btn-primary" onClick={addUser} style={{width:"100%"}}>+ إضافة المستخدم</button>
               </div>
@@ -369,12 +409,12 @@ export default function App(){
         <div onClick={e=>e.stopPropagation()} style={{background:"#13131a",border:"1px solid #27272a",borderRadius:16,padding:24,width:360}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><div style={{fontWeight:800,fontSize:16}}>تحويل التذكرة</div><button className="btn btn-ghost" onClick={()=>setShowTransfer(false)} style={{padding:"4px 8px"}}>✕</button></div>
           <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>القسم</div>
-            <select className="form-inp" value={transferDept} onChange={e=>{const did=parseInt(e.target.value);setTransferDept(did);const first=users.find(u=>u.dept===did&&u.type==="employee");if(first)setTransferUser(first.id);}}>
+            <select className="form-inp" value={transferDept} onChange={e=>{const did=e.target.value;setTransferDept(did);const first=users.find(u=>u.dept===did&&u.type==="employee");if(first)setTransferUser(first.id);}}>
               {depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
             </select>
           </div>
           <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الموظف</div>
-            <select className="form-inp" value={transferUser} onChange={e=>setTransferUser(parseInt(e.target.value))}>
+            <select className="form-inp" value={transferUser} onChange={e=>setTransferUser(e.target.value)}>
               {users.filter(u=>u.type==="employee"&&u.dept===transferDept).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
@@ -398,7 +438,7 @@ export default function App(){
             <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الأولوية</div><select className="form-inp" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option>عاجلة</option><option>عالية</option><option>متوسطة</option><option>منخفضة</option></select></div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
-            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>المسؤول</div><select className="form-inp" value={form.assignedTo} onChange={e=>setForm({...form,assignedTo:parseInt(e.target.value)})}>{users.filter(u=>u.type==="employee").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>المسؤول</div><select className="form-inp" value={form.assignedTo} onChange={e=>setForm({...form,assignedTo:e.target.value})}>{users.filter(u=>u.type==="employee").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
             <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الاستحقاق</div><input type="date" className="form-inp" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})}/></div>
           </div>
           <div style={{display:"flex",gap:10}}>
