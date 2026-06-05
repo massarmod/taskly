@@ -1,484 +1,398 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-const DEPTS=[{id:1,name:"المشتريات",icon:"🛒",color:"#BA7517"},{id:2,name:"المحاسبة",icon:"💰",color:"#0F6E56"},{id:3,name:"التصنيع",icon:"⚙️",color:"#185FA5"},{id:4,name:"المبيعات",icon:"📈",color:"#993556"}];
-
-const USERS=[
-  {id:1,name:"سالم المطيري",role:"مدير",dept:null,av:"سم",type:"admin",bg:"#534AB7",fg:"#EEEDFE"},
-  {id:2,name:"أحمد الشمري",role:"مشتريات",dept:1,av:"أش",type:"employee",bg:"#BA7517",fg:"#FAEEDA"},
-  {id:3,name:"نورة القحطاني",role:"محاسبة",dept:2,av:"نق",type:"employee",bg:"#0F6E56",fg:"#E1F5EE"},
-  {id:4,name:"خالد الزهراني",role:"تصنيع",dept:3,av:"خز",type:"employee",bg:"#185FA5",fg:"#E6F1FB"},
-  {id:5,name:"سارة العتيبي",role:"مبيعات",dept:4,av:"سع",type:"employee",bg:"#993556",fg:"#FBEAF0"},
-  {id:6,name:"محمد العنزي",role:"عميل",dept:null,av:"مع",type:"client",bg:"#5F5E5A",fg:"#F1EFE8"}
-];
-
-const STATUSES=[
-  {id:"لم تبدأ",label:"لم تبدأ",color:"#888780",bg:"#F1EFE8"},
-  {id:"قيد التنفيذ",label:"قيد التنفيذ",color:"#185FA5",bg:"#E6F1FB"},
-  {id:"معلقة",label:"معلقة",color:"#BA7517",bg:"#FAEEDA"},
-  {id:"مؤجلة",label:"مؤجلة",color:"#993556",bg:"#FBEAF0"},
-  {id:"ملغية",label:"ملغية",color:"#A32D2D",bg:"#FCEBEB"},
-  {id:"مكتملة",label:"مكتملة",color:"#0F6E56",bg:"#E1F5EE"}
-];
-
-const PR_COLOR={"عاجلة":["#A32D2D","#FCEBEB"],"عالية":["#993556","#FBEAF0"],"متوسطة":["#BA7517","#FAEEDA"],"منخفضة":["#0F6E56","#E1F5EE"]};
+const DEFAULT_DEPTS=[{id:1,name:"المشتريات",icon:"🛒",color:"#B87B0A"},{id:2,name:"المحاسبة",icon:"💰",color:"#0F6E56"},{id:3,name:"التصنيع",icon:"⚙️",color:"#185FA5"},{id:4,name:"المبيعات",icon:"📈",color:"#993556"}];
+const DEFAULT_USERS=[{id:1,name:"سالم المطيري",role:"مدير",dept:null,av:"سم",type:"admin",bg:"#534AB7",fg:"#EEEDFE"},{id:2,name:"أحمد الشمري",role:"مشتريات",dept:1,av:"أش",type:"employee",bg:"#B87B0A",fg:"#FAEEDA"},{id:3,name:"نورة القحطاني",role:"محاسبة",dept:2,av:"نق",type:"employee",bg:"#0F6E56",fg:"#E1F5EE"},{id:4,name:"خالد الزهراني",role:"تصنيع",dept:3,av:"خز",type:"employee",bg:"#185FA5",fg:"#E6F1FB"},{id:5,name:"سارة العتيبي",role:"مبيعات",dept:4,av:"سع",type:"employee",bg:"#993556",fg:"#FBEAF0"},{id:6,name:"شركة النسيج",role:"عميل",dept:null,av:"عم",type:"client",bg:"#5F5E5A",fg:"#F1EFE8"}];
+const PR_COLOR={"عاجلة":"#E24B4A","عالية":"#BA7517","متوسطة":"#185FA5","منخفضة":"#3B6D11"};
+const ST_COLOR={"لم تبدأ":"#5F5E5A","قيد التنفيذ":"#BA7517","مكتملة":"#0F6E56"};
+const DEPT_COLORS=["#B87B0A","#0F6E56","#185FA5","#993556","#534AB7","#7C3D8F","#C0392B","#1A6B5A"];
+const DEPT_ICONS=["🛒","💰","⚙️","📈","📦","🔧","📋","🏭","💼","🎯"];
+const AV_COLORS=["#534AB7","#B87B0A","#0F6E56","#185FA5","#993556","#7C3D8F","#C0392B","#1A6B5A"];
 
 const INIT_TICKETS=[
-  {id:"TK-001",title:"طلب قماش صوف",type:"شراء",priority:"عالية",status:"قيد التنفيذ",openedBy:6,currentAssignee:2,currentDept:1,createdAt:"2026-06-04",dueDate:"2026-06-10",transfers:[],chat:[{uid:6,text:"محتاجين 200 متر قماش صوف أبيض",time:"09:00",type:"text"},{uid:2,text:"تم استلام الطلب، سأبدأ بالتسعير",time:"09:15",type:"text"},{uid:6,text:"شكراً، ننتظر",time:"09:20",type:"text"}]},
-  {id:"TK-002",title:"صيانة ماكينة الخياطة",type:"صيانة",priority:"عاجلة",status:"معلقة",openedBy:4,currentAssignee:2,currentDept:1,createdAt:"2026-06-05",dueDate:"2026-06-06",transfers:[{from:4,to:2,dept:1,note:"نحتاج قطع غيار",time:"08:30"}],chat:[{uid:4,text:"الماكينة توقفت عن العمل",time:"08:20",type:"text"},{uid:4,text:"تحويل إلى المشتريات لتوفير قطع الغيار",time:"08:30",type:"transfer",to:2,toDept:1},{uid:2,text:"بنطلب القطع اليوم",time:"09:00",type:"text"}]},
-  {id:"TK-003",title:"فاتورة مورد الأقمشة",type:"استفسار",priority:"متوسطة",status:"مكتملة",openedBy:2,currentAssignee:3,currentDept:2,createdAt:"2026-06-03",dueDate:"2026-06-07",transfers:[{from:2,to:3,dept:2,note:"للتدقيق المحاسبي",time:"10:00"}],chat:[{uid:2,text:"نحتاج مراجعة فاتورة رقم INV-441",time:"10:00",type:"text"},{uid:2,text:"تحويل إلى المحاسبة",time:"10:00",type:"transfer",to:3,toDept:2},{uid:3,text:"تم التدقيق والاعتماد ✓",time:"11:30",type:"text"},{uid:1,text:"تم إغلاق التذكرة — السبب: اكتملت مراجعة الفاتورة",time:"12:00",type:"close",newStatus:"مكتملة"}]},
-  {id:"TK-004",title:"عرض سعر لعميل جديد",type:"استفسار",priority:"منخفضة",status:"لم تبدأ",openedBy:5,currentAssignee:5,currentDept:4,createdAt:"2026-06-05",dueDate:"2026-06-08",transfers:[],chat:[{uid:5,text:"العميل يطلب عرض سعر لـ 500 قطعة",time:"14:00",type:"text"}]}
+  {id:"TK-001",title:"شراء قماش قطني",type:"شراء",priority:"عالية",status:"قيد التنفيذ",openedBy:2,currentDept:2,currentAssignee:3,createdAt:"2026-05-20",dueDate:"2026-06-10",transfers:[{from:2,to:3,dept:2,note:"محتاج اعتماد ميزانية",time:"09:30"}],chat:[{uid:2,text:"نحتاج 500 متر قماش قطني درجة أولى",time:"09:00",type:"msg"},{uid:2,text:"تحويل إلى نورة القحطاني (المحاسبة) — محتاج اعتماد ميزانية",time:"09:30",type:"transfer"},{uid:3,text:"جاري مراجعة الميزانية",time:"10:30",type:"msg"}]},
+  {id:"TK-002",title:"صيانة ماكينة الخياطة",type:"صيانة",priority:"عاجلة",status:"لم تبدأ",openedBy:4,currentDept:3,currentAssignee:4,createdAt:"2026-05-22",dueDate:"2026-05-30",transfers:[],chat:[{uid:4,text:"الماكينة رقم 3 تحتاج صيانة عاجلة",time:"08:00",type:"msg"}]},
+  {id:"TK-003",title:"استفسار عميل",type:"استفسار",priority:"متوسطة",status:"قيد التنفيذ",openedBy:6,currentDept:4,currentAssignee:5,createdAt:"2026-05-23",dueDate:"2026-06-01",transfers:[],chat:[{uid:6,text:"متى يكون الطلب جاهز؟",time:"11:00",type:"msg"},{uid:5,text:"نتوقع الجاهزية خلال أسبوع",time:"11:45",type:"msg"}]},
+  {id:"TK-004",title:"توريد أقمشة صيفية",type:"شراء",priority:"منخفضة",status:"مكتملة",openedBy:2,currentDept:1,currentAssignee:2,createdAt:"2026-05-10",dueDate:"2026-05-25",transfers:[],chat:[{uid:2,text:"تم استلام البضاعة بالكامل",time:"14:00",type:"msg"}]}
 ];
+const INIT_TASKS=[{id:1,uid:2,title:"مراجعة عروض الأسعار",done:false,priority:"عالية"},{id:2,uid:2,title:"إرسال تقرير المشتريات",done:true,priority:"متوسطة"},{id:3,uid:3,title:"مراجعة كشف الحسابات",done:false,priority:"عالية"},{id:4,uid:4,title:"جدولة صيانة الماكينات",done:false,priority:"منخفضة"}];
 
-function getTime(){return new Date().toTimeString().slice(0,5);}
-
-function Badge({label,color,bg}){return<span style={{display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:500,color,background:bg}}>{label}</span>;}
-
-function StBadge({status}){const s=STATUSES.find(x=>x.id===status)||STATUSES[0];return<Badge label={s.label} color={s.color} bg={s.bg}/>;}
-
-function PrBadge({priority}){const c=PR_COLOR[priority]||["#888780","#F1EFE8"];return<Badge label={priority} color={c[0]} bg={c[1]}/>;}
-
-function Av({user,size=28}){
-  if(!user)return null;
-  return<div style={{width:size,height:size,borderRadius:"50%",background:user.bg,color:user.fg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size<=24?9:11,fontWeight:500,flexShrink:0}}>{user.av}</div>;
-}
+function initials(name){return name.trim().split(" ").map(w=>w[0]).join("").slice(0,2);}
+function Av({user,size=28}){return(<div style={{width:size,height:size,borderRadius:"50%",background:user.bg,color:user.fg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:Math.round(size*0.38),flexShrink:0}}>{user.av}</div>);}
+function Badge({label,color}){return(<span style={{display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:700,background:color+"20",color,whiteSpace:"nowrap"}}>{label}</span>);}
 
 export default function App(){
-  const [tickets,setTickets]=useState(INIT_TICKETS);
-  const [currentUser,setCurrentUser]=useState(USERS[0]);
+  const [currentUser,setCurrentUser]=useState(DEFAULT_USERS[0]);
   const [page,setPage]=useState("dashboard");
+  const [tickets,setTickets]=useState(INIT_TICKETS);
+  const [depts,setDepts]=useState(DEFAULT_DEPTS);
+  const [users,setUsers]=useState(DEFAULT_USERS);
+  const [personalTasks,setPersonalTasks]=useState(INIT_TASKS);
   const [selectedTicket,setSelectedTicket]=useState(null);
-  const [showModal,setShowModal]=useState(null); // "newTicket"|"transfer"|"status"
-  const [modalData,setModalData]=useState({});
+  const [empTab,setEmpTab]=useState("tickets");
+  const [settingsTab,setSettingsTab]=useState("depts");
+  const [chatMsg,setChatMsg]=useState("");
+  const [newTaskText,setNewTaskText]=useState("");
+  const [showModal,setShowModal]=useState(false);
+  const [showTransfer,setShowTransfer]=useState(false);
+  const [transferDept,setTransferDept]=useState(1);
+  const [transferUser,setTransferUser]=useState(2);
+  const [transferNote,setTransferNote]=useState("");
+  const [form,setForm]=useState({title:"",type:"شراء",priority:"متوسطة",assignedTo:2,dueDate:""});
+  const [newDept,setNewDept]=useState({name:"",icon:"📦",color:"#534AB7"});
+  const [newUser,setNewUser]=useState({name:"",dept:1,type:"employee"});
+  const [editDept,setEditDept]=useState(null);
+  const [editUser,setEditUser]=useState(null);
+  const fileRef=useRef();
 
   const isAdmin=currentUser.type==="admin";
-  const canChangeStatus=(tkt)=>isAdmin||currentUser.id===tkt.openedBy;
+  const isClient=currentUser.type==="client";
+  const visible=isAdmin?tickets:isClient?tickets.filter(t=>t.openedBy===currentUser.id):tickets.filter(t=>t.openedBy===currentUser.id||t.currentAssignee===currentUser.id||t.currentDept===currentUser.dept);
 
   function navTo(p){setPage(p);setSelectedTicket(null);}
-  function openTicket(id){const t=tickets.find(x=>x.id===id);if(t){setSelectedTicket(t);setPage("tickets");}}
+  function switchUser(u){setCurrentUser(u);setSelectedTicket(null);setPage("dashboard");}
 
-  function sendMsg(ticketId,text){
-    if(!text.trim())return;
-    const time=getTime();
-    setTickets(prev=>prev.map(t=>t.id===ticketId?{...t,chat:[...t.chat,{uid:currentUser.id,text,time,type:"text"}]}:t));
-    setSelectedTicket(prev=>prev?{...prev,chat:[...prev.chat,{uid:currentUser.id,text,time,type:"text"}]}:prev);
+  function sendChat(){
+    if(!chatMsg.trim()||!selectedTicket)return;
+    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,chat:[...t.chat,{uid:currentUser.id,text:chatMsg,time,type:"msg"}]}:t);
+    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));setChatMsg("");
   }
 
-  function doTransfer(ticketId,toUserId,toDeptId,note){
-    const toUser=USERS.find(u=>u.id===toUserId);
-    const toDept=DEPTS.find(d=>d.id===toDeptId);
-    const time=getTime();
-    const transferEntry={from:currentUser.id,to:toUserId,dept:toDeptId,note,time};
-    const chatEntry={uid:currentUser.id,text:`تحويل إلى ${toUser?.name} (${toDept?.name})${note?" — "+note:""}`,time,type:"transfer"};
-    setTickets(prev=>prev.map(t=>t.id===ticketId?{...t,currentAssignee:toUserId,currentDept:toDeptId,status:t.status==="لم تبدأ"?"قيد التنفيذ":t.status,transfers:[...t.transfers,transferEntry],chat:[...t.chat,chatEntry]}:t));
-    setSelectedTicket(prev=>prev?{...prev,currentAssignee:toUserId,currentDept:toDeptId,transfers:[...prev.transfers,transferEntry],chat:[...prev.chat,chatEntry]}:prev);
-    setShowModal(null);
+  function sendFile(e){
+    const file=e.target.files[0];if(!file||!selectedTicket)return;
+    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const isImg=file.type.startsWith("image/");
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,chat:[...t.chat,{uid:currentUser.id,text:file.name,time,type:isImg?"image":"file",data:ev.target.result}]}:t);
+      setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+    };reader.readAsDataURL(file);e.target.value="";
   }
 
-  function applyStatusChange(ticketId,newStatus,reason){
-    const time=getTime();
-    const isClosed=newStatus==="مكتملة"||newStatus==="ملغية";
-    const text=`${isClosed?"تم إغلاق التذكرة":"تم تغيير الحالة إلى "+newStatus}${reason?" — "+reason:""}`;
-    const chatEntry={uid:currentUser.id,text,time,type:"close",newStatus};
-    setTickets(prev=>prev.map(t=>t.id===ticketId?{...t,status:newStatus,chat:[...t.chat,chatEntry]}:t));
-    setSelectedTicket(prev=>prev?{...prev,status:newStatus,chat:[...prev.chat,chatEntry]}:prev);
-    setShowModal(null);
+  function doTransfer(){
+    if(!selectedTicket)return;
+    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const toUser=users.find(u=>u.id===transferUser);const toDept=depts.find(d=>d.id===transferDept);
+    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,currentAssignee:transferUser,currentDept:transferDept,status:"قيد التنفيذ",transfers:[...t.transfers,{from:currentUser.id,to:transferUser,dept:transferDept,note:transferNote,time}],chat:[...t.chat,{uid:currentUser.id,text:`تحويل إلى ${toUser?.name} (${toDept?.name})${transferNote?` — ${transferNote}`:""}`,time,type:"transfer"}]}:t);
+    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+    setShowTransfer(false);setTransferNote("");
   }
 
-  function createTicket(form){
-    const assignee=USERS.find(u=>u.id===form.assignedTo);
+  function closeTicket(){
+    if(!selectedTicket)return;
+    const now=new Date();const time=`${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const updated=tickets.map(t=>t.id===selectedTicket.id?{...t,status:"مكتملة",chat:[...t.chat,{uid:currentUser.id,text:"تم إغلاق التذكرة ✓",time,type:"system"}]}:t);
+    setTickets(updated);setSelectedTicket(updated.find(t=>t.id===selectedTicket.id));
+  }
+
+  function createTicket(){
+    if(!form.title.trim())return;
     const id="TK-"+String(tickets.length+1).padStart(3,"0");
-    const now=new Date().toISOString().split("T")[0];
-    const time=getTime();
-    setTickets(prev=>[...prev,{...form,id,openedBy:currentUser.id,currentAssignee:form.assignedTo,currentDept:assignee?.dept||1,createdAt:now,transfers:[],chat:[{uid:currentUser.id,text:`تم فتح التذكرة: ${form.title}`,time,type:"system"}]}]);
-    setShowModal(null);
+    const now=new Date();const time=now.toTimeString().slice(0,5);const date=now.toISOString().split("T")[0];
+    const assignee=users.find(u=>u.id===form.assignedTo);
+    setTickets([...tickets,{...form,id,openedBy:currentUser.id,currentDept:assignee?.dept||currentUser.dept,currentAssignee:form.assignedTo,createdAt:date,transfers:[],chat:[{uid:currentUser.id,text:`تم فتح التذكرة: ${form.title}`,time,type:"system"}]}]);
+    setShowModal(false);setForm({title:"",type:"شراء",priority:"متوسطة",assignedTo:2,dueDate:""});
   }
 
-  const navItems=[
-    {id:"dashboard",label:"الرئيسية"},
-    {id:"tickets",label:"التذاكر"},
-    {id:"my",label:"مهامي"},
-    ...(isAdmin?[{id:"team",label:"الفريق"}]:[])
-  ];
+  function addDept(){
+    if(!newDept.name.trim())return;
+    const id=Math.max(...depts.map(d=>d.id),0)+1;
+    setDepts([...depts,{...newDept,id}]);setNewDept({name:"",icon:"📦",color:"#534AB7"});
+  }
+  function deleteDept(id){if(users.some(u=>u.dept===id)){alert("لا يمكن حذف قسم فيه موظفين");return;}setDepts(depts.filter(d=>d.id!==id));}
+  function saveEditDept(){setDepts(depts.map(d=>d.id===editDept.id?editDept:d));setEditDept(null);}
+
+  function addUser(){
+    if(!newUser.name.trim())return;
+    const id=Math.max(...users.map(u=>u.id),0)+1;
+    const dept=depts.find(d=>d.id===newUser.dept);
+    const colorIdx=(id-1)%AV_COLORS.length;
+    const av=initials(newUser.name);
+    setUsers([...users,{id,name:newUser.name,role:dept?.name||"موظف",dept:newUser.type==="employee"?newUser.dept:null,av,type:newUser.type,bg:AV_COLORS[colorIdx],fg:"#fff"}]);
+    setNewUser({name:"",dept:1,type:"employee"});
+  }
+  function deleteUser(id){if(id===currentUser.id){alert("لا يمكن حذف المستخدم الحالي");return;}setUsers(users.filter(u=>u.id!==id));}
+  function saveEditUser(){
+    const dept=depts.find(d=>d.id===editUser.dept);
+    setUsers(users.map(u=>u.id===editUser.id?{...editUser,role:editUser.type==="employee"?dept?.name||"موظف":editUser.role,av:initials(editUser.name)}:u));
+    setEditUser(null);
+  }
+
+  function toggleTask(id){setPersonalTasks(personalTasks.map(t=>t.id===id?{...t,done:!t.done}:t));}
+  function addTask(){if(!newTaskText.trim())return;setPersonalTasks([...personalTasks,{id:Date.now(),uid:currentUser.id,title:newTaskText.trim(),done:false,priority:"متوسطة"}]);setNewTaskText("");}
+
+  const navItems=[{id:"dashboard",icon:"🏠",label:"الرئيسية"},{id:"tickets",icon:"🎫",label:"التذاكر"},...(!isClient?[{id:"my",icon:"✅",label:"مهامي"}]:[]),...(isAdmin?[{id:"team",icon:"👥",label:"الفريق"},{id:"settings",icon:"⚙️",label:"الإعدادات"}]:[])];
+  const stats=[{l:"إجمالي التذاكر",v:visible.length,c:"#534AB7"},{l:"قيد التنفيذ",v:visible.filter(t=>t.status==="قيد التنفيذ").length,c:"#BA7517"},{l:"مكتملة",v:visible.filter(t=>t.status==="مكتملة").length,c:"#0F6E56"},{l:"عاجلة",v:visible.filter(t=>t.priority==="عاجلة").length,c:"#E24B4A"}];
+  const topTitle=selectedTicket?`← ${selectedTicket.id}`:{dashboard:"لوحة التحكم",tickets:"التذاكر",my:"مهامي",team:"الفريق",settings:"الإعدادات"}[page];
+  const canAct=selectedTicket&&!isClient&&(isAdmin||selectedTicket.currentAssignee===currentUser.id);
 
   return(
-    <div dir="rtl" style={{display:"flex",height:"100vh",fontFamily:"system-ui,sans-serif",background:"#fff",color:"#111"}}>
+    <div style={{display:"flex",height:"100vh",width:"100vw",background:"#0a0a0f",color:"#e2e8f0",fontFamily:"'Cairo',sans-serif",direction:"rtl",position:"relative"}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}.nav-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:#a1a1aa;transition:all .15s;border:none;background:transparent;font-family:'Cairo',sans-serif;width:100%;text-align:right}.nav-btn:hover{background:#18181b;color:#e2e8f0}.nav-btn.active{background:#1e1e2e;color:#a5b4fc}.card{background:#13131a;border:1px solid #27272a;border-radius:14px}.kan-card{background:#13131a;border:1px solid #27272a;border-radius:10px;padding:12px;cursor:pointer;margin-bottom:8px;transition:border-color .15s}.kan-card:hover{border-color:#6366f1}.btn{cursor:pointer;border:none;font-family:'Cairo',sans-serif;transition:all .15s;font-weight:700;border-radius:8px}.btn:hover{filter:brightness(1.1)}.btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:8px 16px;font-size:13px}.btn-ghost{background:#1e1e24;color:#a1a1aa;padding:8px 14px;font-size:13px}.btn-danger{background:#3a1a1a;color:#ef4444;padding:6px 10px;font-size:12px}.ticket-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1e1e24;cursor:pointer}.ticket-row:hover{opacity:.8}.ticket-row:last-child{border-bottom:none}.form-inp{background:#1a1a22;border:1px solid #27272a;border-radius:8px;padding:8px 12px;font-size:13px;color:#e2e8f0;font-family:'Cairo',sans-serif;outline:none;width:100%}.form-inp:focus{border-color:#6366f1}.tab-btn{padding:5px 14px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #27272a;background:transparent;color:#71717a;font-family:'Cairo',sans-serif;transition:all .15s}.tab-btn.active{background:#1e1e3e;color:#a5b4fc;border-color:#6366f130}.task-check{width:18px;height:18px;border-radius:4px;border:1.5px solid #52525b;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}.task-check.done{background:#534AB7;border-color:#534AB7;color:#fff;font-size:11px}.settings-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e1e24}.settings-row:last-child{border-bottom:none}`}</style>
 
-      {/* Sidebar */}
-      <div style={{width:190,background:"#f8f8f8",borderLeft:"1px solid #e5e5e5",display:"flex",flexDirection:"column",padding:"12px 8px",gap:2,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 10px",marginBottom:12}}>
-          <div style={{width:28,height:28,borderRadius:8,background:"#534AB7",display:"flex",alignItems:"center",justifyContent:"center",color:"#EEEDFE",fontSize:13,fontWeight:500}}>T</div>
-          <span style={{fontSize:15,fontWeight:500}}>Taskly</span>
+      <div style={{width:200,background:"#0d0d14",borderLeft:"1px solid #1e1e24",display:"flex",flexDirection:"column",padding:"12px 8px",gap:2,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:14}}>
+          <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:15}}>T</div>
+          <span style={{fontWeight:900,fontSize:18,background:"linear-gradient(135deg,#a5b4fc,#c4b5fd)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Taskly</span>
         </div>
-        {navItems.map(n=>(
-          <div key={n.id} onClick={()=>navTo(n.id)} style={{padding:"7px 10px",borderRadius:8,cursor:"pointer",fontSize:13,color:page===n.id?"#534AB7":"#666",background:page===n.id?"#fff":"transparent",fontWeight:page===n.id?500:400,border:page===n.id?"1px solid #e5e5e5":"1px solid transparent"}}>
-            {n.label}
-          </div>
-        ))}
+        {navItems.map(n=><button key={n.id} className={`nav-btn${page===n.id?" active":""}`} onClick={()=>navTo(n.id)}><span>{n.icon}</span><span>{n.label}</span></button>)}
         <div style={{flex:1}}/>
-        <div style={{borderTop:"1px solid #e5e5e5",paddingTop:10}}>
-          <div style={{fontSize:10,color:"#aaa",padding:"0 8px",marginBottom:6}}>تبديل المستخدم</div>
-          {USERS.map(u=>(
-            <div key={u.id} onClick={()=>setCurrentUser(u)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:8,cursor:"pointer",background:currentUser.id===u.id?"#fff":"transparent"}}>
-              <Av user={u} size={22}/>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:11,fontWeight:500,color:currentUser.id===u.id?"#534AB7":"#333",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</div>
-                <div style={{fontSize:9,color:"#aaa"}}>{u.type==="admin"?"مدير":u.type==="client"?"عميل":"موظف"}</div>
-              </div>
+        <div style={{borderTop:"1px solid #1e1e24",paddingTop:12}}>
+          <div style={{fontSize:10,color:"#52525b",marginBottom:8,paddingRight:4}}>تبديل المستخدم</div>
+          {users.map(u=><div key={u.id} onClick={()=>switchUser(u)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:8,cursor:"pointer",background:currentUser.id===u.id?"#18181b":"transparent"}}>
+            <Av user={u} size={24}/><div style={{minWidth:0}}><div style={{fontSize:11,fontWeight:700,color:currentUser.id===u.id?"#a5b4fc":"#a1a1aa",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name.split(" ")[0]}</div><div style={{fontSize:9,color:"#52525b"}}>{u.role}</div></div>
+          </div>)}
+        </div>
+      </div>
+
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{background:"#0d0d14",borderBottom:"1px solid #1e1e24",padding:"0 22px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div style={{fontSize:15,fontWeight:800}}>{topTitle}</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            {(page==="tickets"||page==="dashboard")&&!isClient&&!selectedTicket&&<button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ تذكرة جديدة</button>}
+            {canAct&&selectedTicket?.status!=="مكتملة"&&<>
+              <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>setShowTransfer(true)}>↗ تحويل</button>
+              <button className="btn btn-danger" style={{fontSize:12}} onClick={closeTicket}>✓ إغلاق</button>
+            </>}
+            <div style={{display:"flex",alignItems:"center",gap:8,background:"#13131a",border:"1px solid #27272a",borderRadius:10,padding:"6px 10px"}}>
+              <Av user={currentUser} size={26}/><div style={{fontSize:12,fontWeight:700}}>{currentUser.name.split(" ")[0]}</div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",borderBottom:"1px solid #e5e5e5",flexShrink:0}}>
-          {selectedTicket
-            ?<button onClick={()=>setSelectedTicket(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#666",display:"flex",alignItems:"center",gap:4}}>← رجوع</button>
-            :<div style={{fontSize:14,fontWeight:500}}>{navItems.find(n=>n.id===page)?.label||""}</div>
-          }
-          {!selectedTicket&&page==="tickets"&&(
-            <button onClick={()=>{setModalData({title:"",type:"شراء",priority:"متوسطة",assignedTo:2,dueDate:""});setShowModal("newTicket");}} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"none",background:"#534AB7",color:"#EEEDFE"}}>
-              + تذكرة جديدة
-            </button>
-          )}
-        </div>
-
-        <div style={{flex:1,overflow:"auto",padding:16}}>
-          {selectedTicket
-            ?<TicketDetail ticket={selectedTicket} tickets={tickets} currentUser={currentUser} canChangeStatus={canChangeStatus} onSendMsg={sendMsg} onTransfer={(id)=>{setModalData({ticketId:id,dept:1,user:2,note:""});setShowModal("transfer");}} onChangeStatus={(id)=>{setModalData({ticketId:id,status:selectedTicket.status,reason:""});setShowModal("status");}}/>
-            :page==="dashboard"?<Dashboard tickets={tickets} onOpenTicket={openTicket}/>
-            :page==="tickets"?<TicketsList tickets={tickets} onOpenTicket={openTicket}/>
-            :page==="my"?<MyTickets tickets={tickets} currentUser={currentUser} onOpenTicket={openTicket}/>
-            :page==="team"?<Team tickets={tickets}/>
-            :null
-          }
-        </div>
-      </div>
-
-      {/* Modals */}
-      {showModal&&(
-        <div onClick={(e)=>{if(e.target===e.currentTarget)setShowModal(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:12,padding:20,width:360,maxHeight:520,overflowY:"auto",border:"1px solid #e5e5e5"}}>
-            {showModal==="newTicket"&&<NewTicketModal data={modalData} onChange={setModalData} onCreate={createTicket} onClose={()=>setShowModal(null)}/>}
-            {showModal==="transfer"&&<TransferModal data={modalData} onChange={setModalData} onConfirm={doTransfer} onClose={()=>setShowModal(null)}/>}
-            {showModal==="status"&&<StatusModal data={modalData} onChange={setModalData} onConfirm={applyStatusChange} onClose={()=>setShowModal(null)}/>}
           </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-function Dashboard({tickets,onOpenTicket}){
-  const total=tickets.length;
-  const open=tickets.filter(t=>t.status!=="مكتملة"&&t.status!=="ملغية").length;
-  const done=tickets.filter(t=>t.status==="مكتملة").length;
-  const urgent=tickets.filter(t=>t.priority==="عاجلة").length;
-  return(
-    <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
-        {[["إجمالي التذاكر",total,"#333"],["مفتوحة",open,"#185FA5"],["مكتملة",done,"#0F6E56"],["عاجلة",urgent,"#A32D2D"]].map(([label,val,color])=>(
-          <div key={label} style={{background:"#f8f8f8",borderRadius:8,padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:"#888",marginBottom:4}}>{label}</div>
-            <div style={{fontSize:22,fontWeight:500,color}}>{val}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-        <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>آخر التذاكر</div>
-        {tickets.slice().reverse().slice(0,5).map(tkt=>{
-          const dept=DEPTS.find(d=>d.id===tkt.currentDept);
-          const opener=USERS.find(u=>u.id===tkt.openedBy);
-          return(
-            <div key={tkt.id} onClick={()=>onOpenTicket(tkt.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f0f0f0",cursor:"pointer"}}>
-              <Av user={opener} size={26}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{tkt.title}</div>
-                <div style={{fontSize:10,color:"#aaa"}}>{tkt.id} · {dept?dept.icon+" "+dept.name:""}</div>
-              </div>
-              <StBadge status={tkt.status}/><PrBadge priority={tkt.priority}/>
+        <div style={{flex:1,overflow:"auto",padding:22}}>
+          {page==="dashboard"&&<div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
+              {stats.map(s=><div key={s.l} className="card" style={{padding:"14px 18px"}}><div style={{fontSize:11,color:"#71717a",marginBottom:4}}>{s.l}</div><div style={{fontSize:32,fontWeight:900,color:s.c}}>{s.v}</div></div>)}
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <div className="card" style={{padding:18}}>
+                <div style={{fontWeight:800,marginBottom:14,fontSize:14}}>آخر التذاكر</div>
+                {visible.slice(0,4).map(t=>{const op=users.find(u=>u.id===t.openedBy);return op?(<div key={t.id} className="ticket-row" onClick={()=>{setSelectedTicket(t);setPage("tickets");}}>
+                  <Av user={op} size={30}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id} · {t.createdAt}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
+                </div>):null;})}
+              </div>
+              <div className="card" style={{padding:18}}>
+                <div style={{fontWeight:800,marginBottom:14,fontSize:14}}>الأقسام</div>
+                {depts.map(d=>{const cnt=tickets.filter(t=>t.currentDept===d.id).length;const emp=users.filter(u=>u.dept===d.id&&u.type==="employee").length;return(<div key={d.id} style={{marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:600}}>{d.icon} {d.name}</div><div style={{fontSize:10,color:"#52525b",marginTop:2}}>{emp} موظف · {cnt} تذكرة</div></div><div style={{width:8,height:8,borderRadius:"50%",background:d.color}}/></div>);})}
+              </div>
+            </div>
+          </div>}
 
-function TicketsList({tickets,onOpenTicket}){
-  const groups={"لم تبدأ":[],"قيد التنفيذ":[],"معلقة":[],"مؤجلة":[],"مكتملة":[],"ملغية":[]};
-  tickets.forEach(t=>{if(groups[t.status])groups[t.status].push(t);});
-  const cols=[
-    {label:"لم تبدأ / معلقة / مؤجلة",ids:["لم تبدأ","معلقة","مؤجلة"]},
-    {label:"قيد التنفيذ",ids:["قيد التنفيذ"]},
-    {label:"مكتملة / ملغية",ids:["مكتملة","ملغية"]}
-  ];
-  return(
-    <div style={{display:"flex",gap:12,height:"calc(100vh - 80px)"}}>
-      {cols.map(col=>(
-        <div key={col.label} style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:11,fontWeight:500,color:"#888",marginBottom:8}}>{col.label}</div>
-          {col.ids.flatMap(id=>groups[id]).map(tkt=>{
-            const dept=DEPTS.find(d=>d.id===tkt.currentDept);
-            const assignee=USERS.find(u=>u.id===tkt.currentAssignee);
-            return(
-              <div key={tkt.id} onClick={()=>onOpenTicket(tkt.id)} style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:8,padding:10,cursor:"pointer",marginBottom:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:10,color:"#aaa",fontWeight:500}}>{tkt.id}</span>
-                  <PrBadge priority={tkt.priority}/>
+          {page==="tickets"&&!selectedTicket&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
+            {["لم تبدأ","قيد التنفيذ","مكتملة"].map(st=>{const cols=visible.filter(t=>t.status===st);return(<div key={st}>
+              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}><div style={{width:8,height:8,borderRadius:"50%",background:ST_COLOR[st]}}/><span style={{fontWeight:800,fontSize:13}}>{st}</span><span style={{fontSize:11,color:"#71717a",background:"#18181b",padding:"1px 7px",borderRadius:10}}>{cols.length}</span></div>
+              {cols.map(t=>{const op=users.find(u=>u.id===t.openedBy);const as=users.find(u=>u.id===t.currentAssignee);const dept=depts.find(d=>d.id===t.currentDept);return op?(<div key={t.id} className="kan-card" onClick={()=>setSelectedTicket(t)}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:"#52525b",fontWeight:700}}>{t.id}</span><Badge label={t.priority} color={PR_COLOR[t.priority]}/></div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>{t.title}</div>
+                {dept&&<div style={{fontSize:11,color:dept.color,marginBottom:8}}>{dept.icon} {dept.name}</div>}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",gap:4}}><Av user={op} size={22}/>{as&&as.id!==op.id&&<Av user={as} size={22}/>}</div><span style={{fontSize:10,color:"#52525b"}}>{t.dueDate}</span></div>
+              </div>):null;})}
+            </div>);})}
+          </div>}
+
+          {page==="tickets"&&selectedTicket&&(()=>{
+            const t=selectedTicket;const op=users.find(u=>u.id===t.openedBy);const as=users.find(u=>u.id===t.currentAssignee);const dept=depts.find(d=>d.id===t.currentDept);
+            return(<div>
+              <button className="btn btn-ghost" onClick={()=>setSelectedTicket(null)} style={{marginBottom:14}}>← رجوع</button>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:14}}>
+                <div className="card" style={{display:"flex",flexDirection:"column",height:520}}>
+                  <div style={{padding:"14px 18px",borderBottom:"1px solid #1e1e24"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div><div style={{fontSize:10,color:"#52525b",marginBottom:3}}>{t.id}</div><div style={{fontWeight:800,fontSize:16}}>{t.title}</div></div>
+                      <div style={{display:"flex",gap:6}}><Badge label={t.status} color={ST_COLOR[t.status]}/><Badge label={t.priority} color={PR_COLOR[t.priority]}/></div>
+                    </div>
+                  </div>
+                  <div style={{flex:1,overflow:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:10}}>
+                    {t.chat.map((msg,i)=>{
+                      const u=users.find(x=>x.id===msg.uid);const isMe=msg.uid===currentUser.id;
+                      if(msg.type==="transfer")return(<div key={i} style={{display:"flex",justifyContent:"center"}}><div style={{background:"#1e1e3e",border:"1px solid #6366f130",borderRadius:8,padding:"6px 14px",fontSize:11,color:"#a5b4fc",textAlign:"center"}}>↗ {msg.text}</div></div>);
+                      if(msg.type==="system")return(<div key={i} style={{display:"flex",justifyContent:"center"}}><div style={{background:"#1a1a22",borderRadius:8,padding:"4px 12px",fontSize:11,color:"#52525b"}}>{msg.text}</div></div>);
+                      if(!u)return null;
+                      return(<div key={i} style={{display:"flex",gap:8,flexDirection:isMe?"row-reverse":"row"}}>
+                        <Av user={u} size={30}/>
+                        <div style={{maxWidth:"70%"}}>
+                          <div style={{fontSize:10,color:"#52525b",marginBottom:3,textAlign:isMe?"left":"right"}}>{u.name} · {msg.time}</div>
+                          {msg.type==="image"?<img src={msg.data} alt={msg.text} style={{maxWidth:"100%",borderRadius:8,border:"1px solid #27272a"}}/>
+                          :msg.type==="file"?<div style={{background:isMe?"#1e1e3e":"#1a1a22",border:`1px solid ${isMe?"#6366f130":"#27272a"}`,padding:"8px 12px",borderRadius:10,fontSize:12,display:"flex",alignItems:"center",gap:8}}>📎 {msg.text}</div>
+                          :<div style={{background:isMe?"#1e1e3e":"#1a1a22",border:`1px solid ${isMe?"#6366f130":"#27272a"}`,padding:"8px 12px",borderRadius:10,fontSize:12,lineHeight:1.6}}>{msg.text}</div>}
+                        </div>
+                      </div>);
+                    })}
+                  </div>
+                  <div style={{padding:"10px 14px",borderTop:"1px solid #1e1e24",display:"flex",gap:8,alignItems:"center"}}>
+                    <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" style={{display:"none"}} onChange={sendFile}/>
+                    <button className="btn btn-ghost" style={{padding:"7px 10px"}} onClick={()=>fileRef.current?.click()}>📎</button>
+                    <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendChat()} placeholder="اكتب رسالة..." className="form-inp" style={{flex:1}}/>
+                    <button className="btn btn-primary" onClick={sendChat} style={{padding:"8px 14px"}}>إرسال</button>
+                  </div>
                 </div>
-                <div style={{fontSize:13,fontWeight:500,marginBottom:7}}>{tkt.title}</div>
-                {dept&&<div style={{fontSize:11,marginBottom:6,color:dept.color}}>{dept.icon} {dept.name}</div>}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <Av user={assignee} size={22}/>
-                  <StBadge status={tkt.status}/>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div className="card" style={{padding:14}}>
+                    <div style={{fontWeight:800,marginBottom:12,fontSize:13}}>الحالة الحالية</div>
+                    {as&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><Av user={as} size={36}/><div><div style={{fontSize:11,color:"#71717a"}}>المسؤول الحالي</div><div style={{fontSize:13,fontWeight:600}}>{as.name}</div>{dept&&<div style={{fontSize:11,color:dept.color,marginTop:2}}>{dept.icon} {dept.name}</div>}</div></div>}
+                    {op&&<div style={{display:"flex",alignItems:"center",gap:10}}><Av user={op} size={36}/><div><div style={{fontSize:11,color:"#71717a"}}>فاتح التذكرة</div><div style={{fontSize:13,fontWeight:600}}>{op.name}</div></div></div>}
+                  </div>
+                  {t.transfers.length>0&&<div className="card" style={{padding:14}}>
+                    <div style={{fontWeight:800,marginBottom:12,fontSize:13}}>سجل التحويلات</div>
+                    {t.transfers.map((tr,i)=>{const fromU=users.find(u=>u.id===tr.from);const toU=users.find(u=>u.id===tr.to);const toDept=depts.find(d=>d.id===tr.dept);return(<div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<t.transfers.length-1?"1px solid #1e1e24":"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>{fromU&&<Av user={fromU} size={20}/>}<span style={{fontSize:11,color:"#71717a"}}>→</span>{toU&&<Av user={toU} size={20}/>}<span style={{fontSize:11,fontWeight:600}}>{toU?.name}</span></div>
+                      {toDept&&<div style={{fontSize:10,color:toDept.color}}>{toDept.icon} {toDept.name}</div>}
+                      {tr.note&&<div style={{fontSize:11,color:"#a1a1aa",marginTop:3}}>"{tr.note}"</div>}
+                      <div style={{fontSize:10,color:"#52525b",marginTop:2}}>{tr.time}</div>
+                    </div>);})}
+                  </div>}
+                  <div className="card" style={{padding:14}}>
+                    <div style={{fontWeight:800,marginBottom:12,fontSize:13}}>التفاصيل</div>
+                    {[["النوع",t.type],["تاريخ الإنشاء",t.createdAt],["الاستحقاق",t.dueDate||"—"]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid #1e1e24"}}><span style={{color:"#71717a"}}>{k}</span><span style={{fontWeight:600}}>{v}</span></div>)}
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
+            </div>);
+          })()}
 
-function TicketDetail({ticket:tkt,tickets,currentUser,canChangeStatus,onSendMsg,onTransfer,onChangeStatus}){
-  const [msg,setMsg]=useState("");
-  const fullTkt=tickets.find(t=>t.id===tkt.id)||tkt;
-  const dept=DEPTS.find(d=>d.id===fullTkt.currentDept);
-  const assignee=USERS.find(u=>u.id===fullTkt.currentAssignee);
-  const opener=USERS.find(u=>u.id===fullTkt.openedBy);
-  const isClosed=fullTkt.status==="مكتملة"||fullTkt.status==="ملغية";
-
-  function handleSend(){if(msg.trim()){onSendMsg(fullTkt.id,msg);setMsg("");}}
-
-  return(
-    <div style={{display:"flex",gap:14,height:"calc(100vh - 80px)",maxHeight:530}}>
-      <div style={{flex:1,display:"flex",flexDirection:"column",background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,overflow:"hidden",minWidth:0}}>
-        <div style={{padding:"12px 16px",borderBottom:"1px solid #f0f0f0",flexShrink:0}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div>
-              <div style={{fontSize:10,color:"#aaa",marginBottom:2}}>{fullTkt.id}</div>
-              <div style={{fontSize:15,fontWeight:500}}>{fullTkt.title}</div>
-            </div>
-            <div style={{display:"flex",gap:6,flexShrink:0}}><StBadge status={fullTkt.status}/><PrBadge priority={fullTkt.priority}/></div>
-          </div>
-        </div>
-        <div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:8}}>
-          {fullTkt.chat.map((m,i)=>{
-            const u=USERS.find(x=>x.id===m.uid);
-            const isMe=m.uid===currentUser.id;
-            if(m.type==="transfer")return<div key={i} style={{background:"#EEEDFE",border:"1px solid #AFA9EC",borderRadius:6,padding:"5px 14px",fontSize:11,color:"#534AB7",textAlign:"center",alignSelf:"center"}}>↗ {m.text}</div>;
-            if(m.type==="system")return<div key={i} style={{background:"#f5f5f5",borderRadius:6,padding:"4px 12px",fontSize:11,color:"#888",textAlign:"center",alignSelf:"center"}}>{m.text}</div>;
-            if(m.type==="close"){const s=STATUSES.find(x=>x.id===m.newStatus);return<div key={i} style={{background:s?.bg||"#f5f5f5",border:`1px solid ${s?.color||"#aaa"}40`,borderRadius:6,padding:"5px 14px",fontSize:11,color:s?.color||"#888",textAlign:"center",alignSelf:"center"}}>{m.text}</div>;}
-            return(
-              <div key={i} style={{display:"flex",gap:7,flexDirection:isMe?"row-reverse":"row"}}>
-                <Av user={u} size={26}/>
-                <div>
-                  <div style={{fontSize:10,color:"#aaa",marginBottom:2,textAlign:isMe?"left":"right"}}>{u?.name} · {m.time}</div>
-                  <div style={{background:isMe?"#EEEDFE":"#f5f5f5",borderRadius:isMe?"10px 10px 2px 10px":"10px 10px 10px 2px",padding:"8px 12px",fontSize:12,color:isMe?"#26215C":"#333",maxWidth:"70%"}}>{m.text}</div>
-                </div>
+          {page==="my"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+            <div className="card" style={{padding:18}}>
+              <div style={{display:"flex",gap:6,marginBottom:14}}>
+                {[["tickets","🎫 تذاكري"],["personal","✅ مهام شخصية"]].map(([id,lbl])=><button key={id} className={`tab-btn${empTab===id?" active":""}`} onClick={()=>setEmpTab(id)}>{lbl}</button>)}
               </div>
-            );
-          })}
-        </div>
-        {!isClosed
-          ?<div style={{padding:"10px 16px",borderTop:"1px solid #f0f0f0",display:"flex",gap:8,flexShrink:0}}>
-            <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")handleSend();}} placeholder="اكتب رسالة..." style={{flex:1,background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"7px 10px",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
-            <button onClick={handleSend} style={{background:"#534AB7",border:"none",borderRadius:6,color:"#EEEDFE",padding:"7px 14px",cursor:"pointer",fontSize:12}}>إرسال</button>
-          </div>
-          :<div style={{padding:"10px 16px",borderTop:"1px solid #f0f0f0",textAlign:"center",fontSize:11,color:"#aaa"}}>التذكرة {fullTkt.status} — لا يمكن إضافة رسائل</div>
-        }
-      </div>
-
-      <div style={{width:220,display:"flex",flexDirection:"column",gap:10,flexShrink:0}}>
-        <div style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-          <div style={{fontSize:12,fontWeight:500,marginBottom:10}}>الحالة الحالية</div>
-          <div style={{marginBottom:10}}><StBadge status={fullTkt.status}/></div>
-          {canChangeStatus(fullTkt)
-            ?<button onClick={()=>onChangeStatus(fullTkt.id)} style={{width:"100%",padding:"6px 12px",borderRadius:8,fontSize:11,cursor:"pointer",border:"1px solid #e5e5e5",background:"#f8f8f8",fontFamily:"inherit"}}>تغيير الحالة</button>
-            :<div style={{fontSize:11,color:"#aaa"}}>صلاحية التغيير: منشئ التذكرة والمدير فقط</div>
-          }
-        </div>
-
-        <div style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-          <div style={{fontSize:12,fontWeight:500,marginBottom:10}}>التفاصيل</div>
-          {[["فاتح التذكرة",opener?.name||"-"],["المعين الحالي",assignee?.name||"-"],["القسم",dept?dept.icon+" "+dept.name:"-"],["النوع",fullTkt.type],["الإنشاء",fullTkt.createdAt],["الاستحقاق",fullTkt.dueDate||"-"]].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"4px 0",borderBottom:"1px solid #f0f0f0"}}>
-              <span style={{color:"#888"}}>{k}</span>
-              <span style={{fontWeight:500}}>{v}</span>
-            </div>
-          ))}
-        </div>
-
-        {!isClosed&&<button onClick={()=>onTransfer(fullTkt.id)} style={{width:"100%",padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"1px solid #e5e5e5",background:"#f8f8f8",fontFamily:"inherit"}}>↗ تحويل التذكرة</button>}
-
-        {fullTkt.transfers.length>0&&(
-          <div style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-            <div style={{fontSize:12,fontWeight:500,marginBottom:8}}>سجل التحويلات</div>
-            {fullTkt.transfers.map((tr,i)=>{
-              const fromU=USERS.find(u=>u.id===tr.from);
-              const toU=USERS.find(u=>u.id===tr.to);
-              const toDept=DEPTS.find(d=>d.id===tr.dept);
-              return(
-                <div key={i} style={{fontSize:10,padding:"5px 0",borderBottom:"1px solid #f0f0f0"}}>
-                  <div>{fromU?.name} ← {toU?.name}</div>
-                  <div style={{color:"#aaa"}}>{toDept?.icon} {toDept?.name} · {tr.time}</div>
-                  {tr.note&&<div style={{color:"#666",marginTop:2}}>{tr.note}</div>}
+              {empTab==="tickets"&&visible.filter(t=>t.currentAssignee===currentUser.id).map(t=><div key={t.id} className="ticket-row" onClick={()=>{setSelectedTicket(t);setPage("tickets");}}>
+                <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600}}>{t.title}</div><div style={{fontSize:10,color:"#52525b"}}>{t.id}</div></div><Badge label={t.status} color={ST_COLOR[t.status]}/>
+              </div>)}
+              {empTab==="personal"&&<div>
+                {personalTasks.filter(t=>t.uid===currentUser.id).map(t=><div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #1e1e24"}}>
+                  <div className={`task-check${t.done?" done":""}`} onClick={()=>toggleTask(t.id)}>{t.done?"✓":""}</div>
+                  <span style={{flex:1,fontSize:13,color:t.done?"#52525b":"#e2e8f0",textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
+                  <Badge label={t.priority} color={PR_COLOR[t.priority]}/>
+                </div>)}
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <input value={newTaskText} onChange={e=>setNewTaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="أضف مهمة..." className="form-inp" style={{flex:1}}/>
+                  <button className="btn btn-primary" onClick={addTask}>+</button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MyTickets({tickets,currentUser,onOpenTicket}){
-  const myTickets=tickets.filter(t=>t.currentAssignee===currentUser.id||t.openedBy===currentUser.id);
-  return(
-    <div style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-      <div style={{fontSize:13,fontWeight:500,marginBottom:12}}>تذاكري</div>
-      {myTickets.length===0&&<div style={{color:"#aaa",fontSize:12}}>لا توجد تذاكر</div>}
-      {myTickets.map(tkt=>{
-        const dept=DEPTS.find(d=>d.id===tkt.currentDept);
-        return(
-          <div key={tkt.id} onClick={()=>onOpenTicket(tkt.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f0f0f0",cursor:"pointer"}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:500}}>{tkt.title}</div>
-              <div style={{fontSize:10,color:"#aaa"}}>{tkt.id} · {dept?dept.icon+" "+dept.name:""}</div>
+              </div>}
             </div>
-            <StBadge status={tkt.status}/><PrBadge priority={tkt.priority}/>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+            <div className="card" style={{padding:18}}>
+              <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>إحصائياتي</div>
+              {[{l:"تذاكر مفتوحة",v:visible.filter(t=>t.currentAssignee===currentUser.id&&t.status!=="مكتملة").length,c:"#BA7517"},{l:"تذاكر مكتملة",v:visible.filter(t=>t.currentAssignee===currentUser.id&&t.status==="مكتملة").length,c:"#0F6E56"},{l:"مهام شخصية",v:personalTasks.filter(t=>t.uid===currentUser.id&&!t.done).length,c:"#6366f1"}].map(s=><div key={s.l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid #1e1e24"}}><span style={{fontSize:13,color:"#a1a1aa"}}>{s.l}</span><span style={{fontSize:26,fontWeight:900,color:s.c}}>{s.v}</span></div>)}
+            </div>
+          </div>}
 
-function Team({tickets}){
-  const employees=USERS.filter(u=>u.type==="employee");
-  return(
-    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
-      {employees.map(u=>{
-        const dept=DEPTS.find(d=>d.id===u.dept);
-        const myTickets=tickets.filter(t=>t.currentAssignee===u.id&&t.status!=="مكتملة"&&t.status!=="ملغية");
-        return(
-          <div key={u.id} style={{background:"#fff",border:"1px solid #e5e5e5",borderRadius:12,padding:14}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <Av user={u} size={34}/>
-              <div>
-                <div style={{fontSize:13,fontWeight:500}}>{u.name}</div>
-                <div style={{fontSize:11,color:dept?.color||"#888"}}>{dept?dept.icon+" "+dept.name:""}</div>
+          {page==="team"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+            {users.filter(u=>u.type==="employee").map(u=>{const my=tickets.filter(t=>t.currentAssignee===u.id);const done=my.filter(t=>t.status==="مكتملة").length;const pct=my.length?Math.round(done/my.length*100):0;const dept=depts.find(d=>d.id===u.dept);return(<div key={u.id} className="card" style={{padding:18}}>
+              <div style={{display:"flex",gap:12,marginBottom:14}}><Av user={u} size={44}/><div><div style={{fontWeight:800}}>{u.name}</div><div style={{fontSize:12,color:dept?.color||"#71717a",marginTop:2}}>{dept?.icon} {dept?.name}</div></div></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#71717a"}}>الإنجاز</span><span style={{fontWeight:700,color:"#a5b4fc"}}>{pct}%</span></div>
+              <div style={{height:5,background:"#1e1e24",borderRadius:3,marginBottom:12}}><div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#6366f1,#8b5cf6)",borderRadius:3}}/></div>
+              <div style={{display:"flex",gap:6}}>{["لم تبدأ","قيد التنفيذ","مكتملة"].map(s=>{const cnt=my.filter(t=>t.status===s).length;return(<div key={s} style={{flex:1,background:"#1a1a22",borderRadius:8,padding:8,textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,color:ST_COLOR[s]}}>{cnt}</div><div style={{fontSize:9,color:"#52525b",marginTop:2}}>{s}</div></div>);})}</div>
+            </div>);})}
+          </div>}
+
+          {page==="settings"&&<div>
+            <div style={{display:"flex",gap:6,marginBottom:20}}>
+              {[["depts","🏢 الأقسام"],["users","👤 الموظفين"]].map(([id,lbl])=><button key={id} className={`tab-btn${settingsTab===id?" active":""}`} onClick={()=>setSettingsTab(id)} style={{fontSize:13,padding:"7px 18px"}}>{lbl}</button>)}
+            </div>
+
+            {settingsTab==="depts"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div className="card" style={{padding:20}}>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>الأقسام الحالية</div>
+                {depts.map(d=>(<div key={d.id} className="settings-row">
+                  {editDept?.id===d.id?<div style={{flex:1,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <input className="form-inp" value={editDept.name} onChange={e=>setEditDept({...editDept,name:e.target.value})} style={{flex:1,minWidth:100}}/>
+                    <select className="form-inp" value={editDept.icon} onChange={e=>setEditDept({...editDept,icon:e.target.value})} style={{width:70}}>{DEPT_ICONS.map(ic=><option key={ic}>{ic}</option>)}</select>
+                    <select className="form-inp" value={editDept.color} onChange={e=>setEditDept({...editDept,color:e.target.value})} style={{width:100}}>{DEPT_COLORS.map(c=><option key={c} value={c} style={{background:c}}>{c}</option>)}</select>
+                    <button className="btn btn-primary" onClick={saveEditDept} style={{padding:"6px 12px",fontSize:12}}>حفظ</button>
+                    <button className="btn btn-ghost" onClick={()=>setEditDept(null)} style={{padding:"6px 10px",fontSize:12}}>إلغاء</button>
+                  </div>:<>
+                    <div style={{width:36,height:36,borderRadius:8,background:d.color+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{d.icon}</div>
+                    <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{d.name}</div><div style={{fontSize:11,color:"#52525b"}}>{users.filter(u=>u.dept===d.id).length} موظف</div></div>
+                    <button className="btn btn-ghost" onClick={()=>setEditDept({...d})} style={{padding:"5px 10px",fontSize:12}}>تعديل</button>
+                    <button className="btn btn-danger" onClick={()=>deleteDept(d.id)} style={{padding:"5px 10px"}}>حذف</button>
+                  </>}
+                </div>))}
               </div>
-            </div>
-            <div style={{fontSize:11,color:"#888",marginBottom:6}}>التذاكر النشطة: {myTickets.length}</div>
-            {myTickets.slice(0,3).map(t=><div key={t.id} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid #f0f0f0"}}>{t.title}</div>)}
+              <div className="card" style={{padding:20}}>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>إضافة قسم جديد</div>
+                <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>اسم القسم</div><input className="form-inp" placeholder="مثال: المستودع" value={newDept.name} onChange={e=>setNewDept({...newDept,name:e.target.value})}/></div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                  <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الأيقونة</div><select className="form-inp" value={newDept.icon} onChange={e=>setNewDept({...newDept,icon:e.target.value})}>{DEPT_ICONS.map(ic=><option key={ic}>{ic}</option>)}</select></div>
+                  <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>اللون</div><select className="form-inp" value={newDept.color} onChange={e=>setNewDept({...newDept,color:e.target.value})}>{DEPT_COLORS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                </div>
+                <button className="btn btn-primary" onClick={addDept} style={{width:"100%"}}>+ إضافة القسم</button>
+              </div>
+            </div>}
+
+            {settingsTab==="users"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div className="card" style={{padding:20}}>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>المستخدمون الحاليون</div>
+                {users.map(u=>(<div key={u.id} className="settings-row">
+                  {editUser?.id===u.id?<div style={{flex:1,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <input className="form-inp" value={editUser.name} onChange={e=>setEditUser({...editUser,name:e.target.value})} style={{flex:1,minWidth:120}} placeholder="الاسم"/>
+                    <select className="form-inp" value={editUser.type} onChange={e=>setEditUser({...editUser,type:e.target.value})} style={{width:100}}><option value="admin">مدير</option><option value="employee">موظف</option><option value="client">عميل</option></select>
+                    {editUser.type==="employee"&&<select className="form-inp" value={editUser.dept} onChange={e=>setEditUser({...editUser,dept:parseInt(e.target.value)})} style={{width:130}}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select>}
+                    <button className="btn btn-primary" onClick={saveEditUser} style={{padding:"6px 12px",fontSize:12}}>حفظ</button>
+                    <button className="btn btn-ghost" onClick={()=>setEditUser(null)} style={{padding:"6px 10px",fontSize:12}}>إلغاء</button>
+                  </div>:<>
+                    <Av user={u} size={36}/>
+                    <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{u.name}</div><div style={{fontSize:11,color:"#52525b"}}>{u.role} · {u.type==="admin"?"مدير":u.type==="client"?"عميل":"موظف"}</div></div>
+                    <button className="btn btn-ghost" onClick={()=>setEditUser({...u})} style={{padding:"5px 10px",fontSize:12}}>تعديل</button>
+                    {u.id!==1&&<button className="btn btn-danger" onClick={()=>deleteUser(u.id)}>حذف</button>}
+                  </>}
+                </div>))}
+              </div>
+              <div className="card" style={{padding:20}}>
+                <div style={{fontWeight:800,marginBottom:16,fontSize:14}}>إضافة مستخدم جديد</div>
+                <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الاسم الكامل</div><input className="form-inp" placeholder="مثال: محمد العمري" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}/></div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>النوع</div><select className="form-inp" value={newUser.type} onChange={e=>setNewUser({...newUser,type:e.target.value})}><option value="employee">موظف</option><option value="admin">مدير</option><option value="client">عميل</option></select></div>
+                  {newUser.type==="employee"&&<div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>القسم</div><select className="form-inp" value={newUser.dept} onChange={e=>setNewUser({...newUser,dept:parseInt(e.target.value)})}>{depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}</select></div>}
+                </div>
+                <button className="btn btn-primary" onClick={addUser} style={{width:"100%"}}>+ إضافة المستخدم</button>
+              </div>
+            </div>}
+          </div>}
+        </div>
+      </div>
+
+      {showTransfer&&<div onClick={()=>setShowTransfer(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#13131a",border:"1px solid #27272a",borderRadius:16,padding:24,width:360}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><div style={{fontWeight:800,fontSize:16}}>تحويل التذكرة</div><button className="btn btn-ghost" onClick={()=>setShowTransfer(false)} style={{padding:"4px 8px"}}>✕</button></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>القسم</div>
+            <select className="form-inp" value={transferDept} onChange={e=>{const did=parseInt(e.target.value);setTransferDept(did);const first=users.find(u=>u.dept===did&&u.type==="employee");if(first)setTransferUser(first.id);}}>
+              {depts.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+            </select>
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function NewTicketModal({data,onChange,onCreate,onClose}){
-  return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:500}}>تذكرة جديدة</div>
-        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:16}}>×</button>
-      </div>
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>العنوان</div>
-        <input value={data.title||""} onChange={e=>onChange({...data,title:e.target.value})} placeholder="وصف الطلب..." style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"7px 10px",fontSize:12,outline:"none",fontFamily:"inherit"}}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <div>
-          <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>النوع</div>
-          <select value={data.type||"شراء"} onChange={e=>onChange({...data,type:e.target.value})} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}>
-            <option>شراء</option><option>صيانة</option><option>استفسار</option>
-          </select>
+          <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الموظف</div>
+            <select className="form-inp" value={transferUser} onChange={e=>setTransferUser(parseInt(e.target.value))}>
+              {users.filter(u=>u.type==="employee"&&u.dept===transferDept).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:18}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>ملاحظة (اختياري)</div>
+            <textarea className="form-inp" rows={3} placeholder="سبب التحويل..." value={transferNote} onChange={e=>setTransferNote(e.target.value)} style={{resize:"none"}}/>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" onClick={()=>setShowTransfer(false)} style={{flex:1}}>إلغاء</button>
+            <button className="btn btn-primary" onClick={doTransfer} style={{flex:2}}>↗ تحويل</button>
+          </div>
         </div>
-        <div>
-          <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>الأولوية</div>
-          <select value={data.priority||"متوسطة"} onChange={e=>onChange({...data,priority:e.target.value})} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}>
-            <option>عاجلة</option><option>عالية</option><option>متوسطة</option><option>منخفضة</option>
-          </select>
+      </div>}
+
+      {showModal&&<div onClick={()=>setShowModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#13131a",border:"1px solid #27272a",borderRadius:16,padding:24,width:400,maxHeight:"90vh",overflow:"auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><div style={{fontWeight:800,fontSize:16}}>تذكرة جديدة</div><button className="btn btn-ghost" onClick={()=>setShowModal(false)} style={{padding:"4px 8px"}}>✕</button></div>
+          <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>العنوان *</div><input className="form-inp" placeholder="عنوان التذكرة..." value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>النوع</div><select className="form-inp" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option>شراء</option><option>صيانة</option><option>استفسار</option><option>أخرى</option></select></div>
+            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الأولوية</div><select className="form-inp" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option>عاجلة</option><option>عالية</option><option>متوسطة</option><option>منخفضة</option></select></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>المسؤول</div><select className="form-inp" value={form.assignedTo} onChange={e=>setForm({...form,assignedTo:parseInt(e.target.value)})}>{users.filter(u=>u.type==="employee").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+            <div><div style={{fontSize:11,color:"#71717a",marginBottom:5}}>الاستحقاق</div><input type="date" className="form-inp" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})}/></div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" onClick={()=>setShowModal(false)} style={{flex:1}}>إلغاء</button>
+            <button className="btn btn-primary" onClick={createTicket} style={{flex:2}}>✓ إنشاء التذكرة</button>
+          </div>
         </div>
-      </div>
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>تعيين إلى</div>
-        <select value={data.assignedTo||2} onChange={e=>onChange({...data,assignedTo:parseInt(e.target.value)})} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}>
-          {USERS.filter(u=>u.type==="employee").map(u=><option key={u.id} value={u.id}>{u.name} — {DEPTS.find(d=>d.id===u.dept)?.name||""}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:14}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>تاريخ الاستحقاق</div>
-        <input type="date" value={data.dueDate||""} onChange={e=>onChange({...data,dueDate:e.target.value})} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}/>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>onCreate({...data,status:"لم تبدأ"})} style={{flex:1,padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"none",background:"#534AB7",color:"#EEEDFE",fontFamily:"inherit"}}>إنشاء</button>
-        <button onClick={onClose} style={{padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"1px solid #e5e5e5",background:"#f8f8f8",fontFamily:"inherit"}}>إلغاء</button>
-      </div>
-    </div>
-  );
-}
-
-function TransferModal({data,onChange,onConfirm,onClose}){
-  const deptUsers=USERS.filter(u=>u.type==="employee"&&u.dept===data.dept);
-  return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:500}}>تحويل التذكرة</div>
-        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:16}}>×</button>
-      </div>
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>القسم</div>
-        <select value={data.dept||1} onChange={e=>{const d=parseInt(e.target.value);const firstUser=USERS.find(u=>u.type==="employee"&&u.dept===d);onChange({...data,dept:d,user:firstUser?.id||data.user});}} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}>
-          {DEPTS.map(d=><option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>الموظف</div>
-        <select value={data.user||""} onChange={e=>onChange({...data,user:parseInt(e.target.value)})} style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"6px 10px",fontSize:12,fontFamily:"inherit"}}>
-          {deptUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:14}}>
-        <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>ملاحظة <span style={{color:"#aaa",fontWeight:400}}>(اختياري)</span></div>
-        <textarea value={data.note||""} onChange={e=>onChange({...data,note:e.target.value})} placeholder="أضف ملاحظة..." style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"7px 10px",fontSize:12,resize:"none",height:60,fontFamily:"inherit"}}/>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>onConfirm(data.ticketId,data.user,data.dept,data.note||"")} style={{flex:1,padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"none",background:"#534AB7",color:"#EEEDFE",fontFamily:"inherit"}}>تحويل</button>
-        <button onClick={onClose} style={{padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"1px solid #e5e5e5",background:"#f8f8f8",fontFamily:"inherit"}}>إلغاء</button>
-      </div>
-    </div>
-  );
-}
-
-function StatusModal({data,onChange,onConfirm,onClose}){
-  return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:500}}>تغيير حالة التذكرة</div>
-        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:16}}>×</button>
-      </div>
-      <div style={{fontSize:12,fontWeight:500,marginBottom:8}}>اختر الحالة الجديدة</div>
-      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
-        {STATUSES.map(s=>(
-          <button key={s.id} onClick={()=>onChange({...data,status:s.id})} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,cursor:"pointer",fontSize:12,border:data.status===s.id?"1px solid #534AB7":"1px solid #e5e5e5",background:data.status===s.id?"#EEEDFE":"#f8f8f8",color:data.status===s.id?"#534AB7":"#333",fontFamily:"inherit",width:"100%",textAlign:"right"}}>
-            <span style={{width:10,height:10,borderRadius:"50%",background:s.color,display:"inline-block",flexShrink:0}}></span>
-            {s.label}
-          </button>
-        ))}
-      </div>
-      <div style={{fontSize:12,fontWeight:500,marginBottom:5}}>سبب التغيير <span style={{color:"#aaa",fontWeight:400}}>(اختياري)</span></div>
-      <textarea value={data.reason||""} onChange={e=>onChange({...data,reason:e.target.value})} placeholder="اكتب سبب تغيير الحالة..." style={{width:"100%",background:"#f8f8f8",border:"1px solid #e5e5e5",borderRadius:6,padding:"7px 10px",fontSize:12,resize:"none",height:60,fontFamily:"inherit",marginBottom:14}}/>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>onConfirm(data.ticketId,data.status,data.reason||"")} style={{flex:1,padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"none",background:"#534AB7",color:"#EEEDFE",fontFamily:"inherit"}}>تأكيد التغيير</button>
-        <button onClick={onClose} style={{padding:"7px 12px",borderRadius:8,fontSize:12,cursor:"pointer",border:"1px solid #e5e5e5",background:"#f8f8f8",fontFamily:"inherit"}}>إلغاء</button>
-      </div>
+      </div>}
     </div>
   );
 }
